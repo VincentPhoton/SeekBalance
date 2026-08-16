@@ -26,9 +26,11 @@
 
 ## 安装
 
-### 方式一：DMG 安装包（推荐）
+### 方式一：DMG 安装包（推荐，Apple 芯片专用）
 
-1. 直接下载：[**SeekBalance-1.0.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.0.dmg)（或到 [Releases](../../releases) 页面下载）
+> ⚠️ 仅支持 **Apple 芯片**（M1 / M2 / M3 / M4，arm64）。Intel Mac 暂不支持。
+
+1. 直接下载：[**SeekBalance-1.0-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.0-arm64.dmg)（或到 [Releases](../../releases) 页面下载）
 2. 打开 DMG，把 `SeekBalance.app` 拖进"应用程序"
 3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
 4. DMG 里附带了"卸载SeekBalance"一键卸载程序（自动清理偏好与缓存）
