@@ -17,13 +17,12 @@
 
 ## 截图
 
-菜单栏显示余额，点击弹出面板：
+菜单栏显示余额，点击弹出面板（点击图片可看大图）：
 
-![菜单栏与面板](screenshots/menu-bar-panel.png)
-
-面板详情（余额、今日用量、累计用量、花费估算）：
-
-![面板详情](screenshots/panel.png)
+<p align="center">
+  <img src="screenshots/menu-bar-panel.png" alt="菜单栏与面板" width="46%">
+  <img src="screenshots/panel.png" alt="面板详情" width="46%">
+</p>
 
 ## 安装
 
