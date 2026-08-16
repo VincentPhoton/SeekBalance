@@ -22,6 +22,8 @@ struct TodayUsage {
   var output: Int64 = 0
   var reasoning: Int64 = 0
   var cost: Double = 0 // 今日花费（按每次请求的时间精确计价）
+  var peakTokens: Int64 = 0 // 今日高峰时段用量（输入+缓存+输出）
+  var offpeakTokens: Int64 = 0 // 今日空闲时段用量
 }
 
 struct Report {
@@ -57,15 +59,19 @@ enum Prices {
     return cal.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 0))!
   }()
 
+  /// 请求时刻的北京时间分钟数（0–1439）
+  static func beijingMinutes(for timeMs: Double) -> Int {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = beijing
+    let comps = cal.dateComponents([.hour, .minute], from: Date(timeIntervalSince1970: timeMs / 1000))
+    return (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+  }
+
   /// 按请求时间取价：8/17 0 点前用老价；之后按请求时刻判断高峰（9-12、14-18）/空闲
   static func price(for timeMs: Double) -> (cacheHit: Double, cacheMiss: Double, output: Double) {
     let date = Date(timeIntervalSince1970: timeMs / 1000)
     guard date >= newPriceDate else { return current }
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = beijing
-    let comps = cal.dateComponents([.hour, .minute], from: date)
-    let minutes = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-    return isPeak(minutes) ? peak : offpeak
+    return isPeak(beijingMinutes(for: timeMs)) ? peak : offpeak
   }
 }
 
@@ -187,6 +193,11 @@ enum DS {
           today.cost += Double(uncached) / 1e6 * p.cacheMiss
             + Double(cacheRead) / 1e6 * p.cacheHit
             + Double(output) / 1e6 * p.output
+          if Prices.isPeak(Prices.beijingMinutes(for: timeMs)) {
+            today.peakTokens += uncached + cacheRead + output
+          } else {
+            today.offpeakTokens += uncached + cacheRead + output
+          }
         }
       }
     }

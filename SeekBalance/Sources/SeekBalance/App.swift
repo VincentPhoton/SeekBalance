@@ -38,6 +38,7 @@ struct Main {
     print("累计: 输入(未命中) \(fmtTokens(t.uncachedInput)) / 缓存命中 \(fmtTokens(t.cacheRead)) / 输出 \(fmtTokens(t.output))")
     if r.today.calls > 0 {
       print("今日: \(r.today.calls) 次请求, 输入(未命中) \(fmtTokens(r.today.uncachedInput)), 缓存 \(fmtTokens(r.today.cacheRead)), 输出 \(fmtTokens(r.today.output))")
+      print("今日高峰/空闲用量: \(fmtTokens(r.today.peakTokens)) / \(fmtTokens(r.today.offpeakTokens))")
       print("今日花费(按请求时间精确): ¥\(String(format: "%.4f", r.todayCost))")
     } else {
       print("今日: 暂无请求记录")
@@ -189,6 +190,7 @@ struct BalancePanelView: View {
         row("今日请求", "\(model.today.calls) 次")
         row("今日输入", "\(fmtTokens(model.today.uncachedInput)) + 缓存\(fmtTokens(model.today.cacheRead))")
         row("今日输出", fmtTokens(model.today.output))
+        row("高峰/空闲用量", "\(fmtTokens(model.today.peakTokens)) / \(fmtTokens(model.today.offpeakTokens))")
         row("今日花费", fmtYuan(model.today.cost), bold: true)
         Divider().padding(.vertical, 2)
       }
@@ -279,6 +281,7 @@ struct BalanceMenuView: View {
         row("今日请求", "\(model.today.calls) 次")
         row("今日输入", "\(fmtTokens(model.today.uncachedInput)) + 缓存\(fmtTokens(model.today.cacheRead))")
         row("今日输出", fmtTokens(model.today.output))
+        row("高峰/空闲用量", "\(fmtTokens(model.today.peakTokens)) / \(fmtTokens(model.today.offpeakTokens))")
         row("今日花费", fmtYuan(model.today.cost), bold: true)
         Divider().padding(.vertical, 2)
       }
