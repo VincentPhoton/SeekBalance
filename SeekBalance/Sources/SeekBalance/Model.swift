@@ -51,8 +51,14 @@ enum DS {
   static var projCachePath: URL { home.appendingPathComponent(".dsh/storages/session_projcache.json") }
   static var sessionsRoot: URL { home.appendingPathComponent(".dsh/sessions") }
 
-  /// 读取 DEEPSEEK_API_KEY（与 dsh 共用同一密钥）
+  /// 读取 DEEPSEEK_API_KEY：优先 dsh 配置文件（老用户），其次本机钥匙串（普通用户粘贴）
   static func apiKey() -> String? {
+    if let key = configAPIKey() { return key }
+    return Keychain.loadAPIKey()
+  }
+
+  /// 从 ~/.dsh/.credentials.yaml 读取（与 dsh 共用同一密钥）
+  private static func configAPIKey() -> String? {
     guard let content = try? String(contentsOf: credentialsPath, encoding: .utf8) else { return nil }
     for line in content.split(separator: "\n") {
       if line.trimmingCharacters(in: .whitespaces).hasPrefix("DEEPSEEK_API_KEY") {

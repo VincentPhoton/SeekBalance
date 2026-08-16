@@ -50,7 +50,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 
 | 依赖 | 说明 |
 |---|---|
-| API 密钥 | **无需安装 dsh**。只需创建一个配置文件 `~/.dsh/.credentials.yaml`，写入一行 `DEEPSEEK_API_KEY: 你的密钥` 即可（dsh 用户已有此文件，可直接使用）。密钥只用于请求 DeepSeek 官方接口 |
+| API 密钥 | **两种方式任选**：① 打开软件，在面板里直接粘贴密钥（自动存入 Mac 钥匙串，系统加密）；② 或创建配置文件 `~/.dsh/.credentials.yaml`，写入一行 `DEEPSEEK_API_KEY: 你的密钥`（dsh 用户已有此文件，直接用）。密钥只用于请求 DeepSeek 官方接口 |
 | zstd | 用于解压 dsh 会话日志。`brew install zstd`（Apple Silicon 在 `/opt/homebrew/bin/zstd`，Intel 在 `/usr/local/bin/zstd`，自动识别） |
 | dsh 会话记录（可选） | 有 dsh 用量统计；没有则"今日/累计用量"显示为空，仅余额可用 |
 
@@ -69,6 +69,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 
 ## 功能细节
 
+- **首次使用**：面板内直接粘贴 DeepSeek API 密钥，自动存入 Mac 钥匙串（无需配置文件）
 - 菜单栏余额文字可开关（面板内"状态栏显示余额"）
 - 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
 - 自动刷新间隔 10 分钟；改动数据层后建议先跑自检

@@ -83,6 +83,9 @@ final class BalanceModel: ObservableObject {
   @Published var costPeak: Double = 0
   @Published var lastUpdated: Date?
   @Published var loading = false
+  // 密钥相关：缺失时面板显示粘贴框；apiKeyInput 是用户输入的密钥
+  @Published var keyMissing = false
+  @Published var apiKeyInput = ""
   private var timer: Timer?
 
   var balanceText: String {
@@ -111,6 +114,18 @@ final class BalanceModel: ObservableObject {
       self.costPeak = rep.costPeak
       self.lastUpdated = rep.updatedAt
       self.loading = false
+      self.keyMissing = DS.apiKey() == nil
+    }
+  }
+
+  /// 保存用户粘贴的密钥到本机钥匙串，然后刷新
+  func saveAPIKey() {
+    let key = apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !key.isEmpty else { return }
+    if Keychain.saveAPIKey(key) {
+      apiKeyInput = ""
+      keyMissing = false
+      refresh()
     }
   }
 }
@@ -154,6 +169,27 @@ struct BalancePanelView: View {
         row("充值 / 赠送", String(format: "¥%.2f / ¥%.2f", b.toppedUp, b.granted))
       } else {
         row("余额", "查询失败", bold: true)
+        if let err = model.balanceError {
+          Text(err).font(.system(size: 9)).foregroundColor(.red).lineLimit(3).padding(.top, 1)
+        }
+      }
+
+      // 首次使用：没有密钥时显示粘贴框（存入本机钥匙串）
+      if model.keyMissing {
+        Divider().padding(.vertical, 2)
+        Text("🔑 粘贴你的 DeepSeek API 密钥：")
+          .font(.system(size: 10))
+        SecureField("sk-…", text: $model.apiKeyInput)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+        HStack(spacing: 8) {
+          Button("保存并刷新") { model.saveAPIKey() }
+            .controlSize(.small)
+            .disabled(model.apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          Spacer()
+          Text("仅存本机钥匙串").font(.system(size: 9)).foregroundColor(.secondary)
+        }
+        .padding(.top, 2)
       }
 
       Divider().padding(.vertical, 2)
@@ -231,6 +267,19 @@ struct BalanceMenuView: View {
         if let err = model.balanceError {
           Text(err).font(.system(size: 10)).foregroundColor(.red).lineLimit(2)
         }
+      }
+
+      if model.keyMissing {
+        Divider().padding(.vertical, 2)
+        Text("🔑 粘贴你的 DeepSeek API 密钥：")
+          .font(.system(size: 10))
+        SecureField("sk-…", text: $model.apiKeyInput)
+          .textFieldStyle(.roundedBorder)
+          .controlSize(.small)
+        Button("保存并刷新") { model.saveAPIKey() }
+          .controlSize(.small)
+          .disabled(model.apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        Text("仅存本机钥匙串").font(.system(size: 9)).foregroundColor(.secondary)
       }
 
       Divider().padding(.vertical, 2)
