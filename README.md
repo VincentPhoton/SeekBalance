@@ -4,7 +4,7 @@
 
 > 本项目由作者提出需求、使用 AI 辅助编写代码。
 
-![Platform](https://img.shields.io/badge/macOS-13%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
+![Platform](https://img.shields.io/badge/macOS-13%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Swift](https://img.shields.io/badge/Swift-5.9-orange) [![Download](https://img.shields.io/badge/下载-最新版-brightgreen)](https://github.com/VincentPhoton/SeekBalance/releases/latest)
 
 ---
 
@@ -28,7 +28,7 @@
 
 ### 方式一：DMG 安装包（推荐）
 
-1. 从 [Releases](../../releases) 下载 `SeekBalance-1.0.dmg`
+1. 直接下载：[**SeekBalance-1.0.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.0.dmg)（或到 [Releases](../../releases) 页面下载）
 2. 打开 DMG，把 `SeekBalance.app` 拖进"应用程序"
 3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
 4. DMG 里附带了"卸载SeekBalance"一键卸载程序（自动清理偏好与缓存）
