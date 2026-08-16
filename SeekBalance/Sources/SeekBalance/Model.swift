@@ -38,9 +38,9 @@ struct Report {
 // MARK: - 价格（元 / 百万 tokens，deepseek-v4-flash）
 
 enum Prices {
-  static let current = (cacheHit: 0.02, cacheMiss: 1.0, output: 2.0) // 8/17 前
-  static let offpeak = (cacheHit: 0.05, cacheMiss: 1.5, output: 4.5) // 8/17+ 空闲
-  static let peak = (cacheHit: 0.10, cacheMiss: 3.0, output: 9.0) // 8/17+ 高峰
+  static let current = (cacheHit: 0.02, cacheMiss: 1.0, output: 2.0) // 老价（2026-08-17 前）
+  static let offpeak = (cacheHit: 0.05, cacheMiss: 1.5, output: 4.5) // 现价·空闲（8/17 起）
+  static let peak = (cacheHit: 0.10, cacheMiss: 3.0, output: 9.0) // 现价·高峰（8/17 起）
 }
 
 // MARK: - 数据获取
