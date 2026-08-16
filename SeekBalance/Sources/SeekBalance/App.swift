@@ -198,10 +198,10 @@ struct BalancePanelView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时
+      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时（高峰红、空闲绿）
       let period = currentPeriodInfo()
-      row("当前时段", period.currentRange)
-      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext))
+      row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext), valueColor: period.nextIsPeak ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
       Divider().padding(.vertical, 2)
 
@@ -252,11 +252,13 @@ struct BalancePanelView: View {
     .onAppear { model.start() }
   }
 
-  private func row(_ k: String, _ v: String, bold: Bool = false) -> some View {
+  private func row(_ k: String, _ v: String, bold: Bool = false, valueColor: Color? = nil) -> some View {
     HStack(spacing: 6) {
       Text(k).foregroundColor(Color(nsColor: .secondaryLabelColor))
       Spacer(minLength: 4)
-      Text(v).fontWeight(bold ? .semibold : .regular)
+      Text(v)
+        .fontWeight(bold ? .semibold : .regular)
+        .foregroundColor(valueColor)
     }
     .padding(.vertical, 1)
   }
@@ -296,10 +298,10 @@ struct BalanceMenuView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时
+      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时（高峰红、空闲绿）
       let period = currentPeriodInfo()
-      row("当前时段", period.currentRange)
-      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext))
+      row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext), valueColor: period.nextIsPeak ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
       Divider().padding(.vertical, 2)
 
@@ -345,12 +347,13 @@ struct BalanceMenuView: View {
     .onAppear { model.start() }
   }
 
-  private func row(_ k: String, _ v: String, bold: Bool = false) -> some View {
+  private func row(_ k: String, _ v: String, bold: Bool = false, valueColor: Color? = nil) -> some View {
     HStack(spacing: 6) {
       Text(k).lineLimit(1)
       Spacer(minLength: 4)
       Text(v)
         .fontWeight(bold ? .semibold : .regular)
+        .foregroundColor(valueColor)
         .lineLimit(1)
     }
     .padding(.vertical, 0.5)
