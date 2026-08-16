@@ -61,7 +61,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 | 余额 | `GET https://api.deepseek.com/user/balance`（Bearer 认证） | **全账户**，实时准确 |
 | 今日用量 | 本机 `~/.dsh/sessions/*/*/session.jsonl.zstd` 会话日志 | **仅本机** |
 | 累计用量 | 本机 `~/.dsh/storages/session_projcache.json` | **仅本机** |
-| 花费 | 按本地用量 × 当前/峰谷价估算 | **仅本机，非官方账单** |
+| 花费 | 按**每次请求的实际时间**精确计价（8/17 前老价；之后按高峰 16:30–24:00 / 空闲价） | **仅本机，非官方账单** |
 
 - 你的 API 密钥**只用于**请求 DeepSeek 官方接口（`api.deepseek.com`），不会发送到任何第三方
 - 本工具**不联网上传任何统计数据**，所有用量数据都来自你本地的 dsh 文件
@@ -70,6 +70,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## 功能细节
 
 - **首次使用**：面板内直接粘贴 DeepSeek API 密钥，自动存入 Mac 钥匙串（无需配置文件）
+- **花费精确计价**：按每次请求的实际时间计价——8/17 前按老价；之后高峰时段（北京时间 16:30–24:00）按高峰价，其余按空闲价
 - 菜单栏余额文字可开关（面板内"状态栏显示余额"）
 - 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
 - 自动刷新间隔 10 分钟；改动数据层后建议先跑自检

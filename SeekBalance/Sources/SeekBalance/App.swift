@@ -22,7 +22,7 @@ struct Main {
       semaphore.signal()
     }
     semaphore.wait()
-    printReport(rep ?? Report(balance: nil, balanceError: "报告生成失败", totals: Totals(), today: TodayUsage(), costCurrent: 0, costOffpeak: 0, costPeak: 0, updatedAt: Date(), model: "?"))
+    printReport(rep ?? Report(balance: nil, balanceError: "报告生成失败", totals: Totals(), today: TodayUsage(), costCurrent: 0, todayCost: 0, cumCost: 0, updatedAt: Date(), model: "?"))
     exit(0)
   }
 
@@ -38,12 +38,12 @@ struct Main {
     print("累计: 输入(未命中) \(fmtTokens(t.uncachedInput)) / 缓存命中 \(fmtTokens(t.cacheRead)) / 输出 \(fmtTokens(t.output))")
     if r.today.calls > 0 {
       print("今日: \(r.today.calls) 次请求, 输入(未命中) \(fmtTokens(r.today.uncachedInput)), 缓存 \(fmtTokens(r.today.cacheRead)), 输出 \(fmtTokens(r.today.output))")
-      print("今日估算花费(现价·空闲/高峰): ¥\(String(format: "%.4f", todayCostOffpeak(r.today))) / ¥\(String(format: "%.4f", todayCostPeak(r.today)))")
+      print("今日花费(按请求时间精确): ¥\(String(format: "%.4f", r.todayCost))")
     } else {
       print("今日: 暂无请求记录")
     }
-    print("累计花费(老价估算): ¥\(String(format: "%.4f", r.costCurrent))")
-    print("累计花费(现价·空闲/高峰): ¥\(String(format: "%.4f", r.costOffpeak)) / ¥\(String(format: "%.4f", r.costPeak))")
+    print("累计花费(按请求时间精确): ¥\(String(format: "%.4f", r.cumCost))")
+    print("累计花费(老价估算·参考): ¥\(String(format: "%.4f", r.costCurrent))")
   }
 }
 
@@ -61,19 +61,6 @@ func fmtYuan(_ n: Double) -> String {
   return "¥" + String(format: "%.4f", n)
 }
 
-/// 今日花费（现价·空闲 / 高峰）
-func todayCostOffpeak(_ today: TodayUsage) -> Double {
-  return Double(today.uncachedInput) / 1e6 * Prices.offpeak.cacheMiss
-    + Double(today.cacheRead) / 1e6 * Prices.offpeak.cacheHit
-    + Double(today.output) / 1e6 * Prices.offpeak.output
-}
-
-func todayCostPeak(_ today: TodayUsage) -> Double {
-  return Double(today.uncachedInput) / 1e6 * Prices.peak.cacheMiss
-    + Double(today.cacheRead) / 1e6 * Prices.peak.cacheHit
-    + Double(today.output) / 1e6 * Prices.peak.output
-}
-
 // MARK: - 模型
 
 @MainActor
@@ -83,8 +70,8 @@ final class BalanceModel: ObservableObject {
   @Published var totals = Totals()
   @Published var today = TodayUsage()
   @Published var costCurrent: Double = 0
-  @Published var costOffpeak: Double = 0
-  @Published var costPeak: Double = 0
+  @Published var todayCost: Double = 0
+  @Published var cumCost: Double = 0
   @Published var lastUpdated: Date?
   @Published var loading = false
   // 密钥相关：缺失时面板显示粘贴框；apiKeyInput 是用户输入的密钥
@@ -114,8 +101,8 @@ final class BalanceModel: ObservableObject {
       self.totals = rep.totals
       self.today = rep.today
       self.costCurrent = rep.costCurrent
-      self.costOffpeak = rep.costOffpeak
-      self.costPeak = rep.costPeak
+      self.todayCost = rep.todayCost
+      self.cumCost = rep.cumCost
       self.lastUpdated = rep.updatedAt
       self.loading = false
       self.keyMissing = DS.apiKey() == nil
@@ -202,13 +189,13 @@ struct BalancePanelView: View {
         row("今日请求", "\(model.today.calls) 次")
         row("今日输入", "\(fmtTokens(model.today.uncachedInput)) + 缓存\(fmtTokens(model.today.cacheRead))")
         row("今日输出", fmtTokens(model.today.output))
-        row("今日花费", "空闲 \(fmtYuan(todayCostOffpeak(model.today))) / 高峰 \(fmtYuan(todayCostPeak(model.today)))", bold: true)
+        row("今日花费", fmtYuan(model.today.cost), bold: true)
         Divider().padding(.vertical, 2)
       }
 
       row("累计输入", "\(fmtTokens(model.totals.uncachedInput)) + 缓存\(fmtTokens(model.totals.cacheRead))")
       row("累计输出", fmtTokens(model.totals.output))
-      row("累计花费", "空闲 \(fmtYuan(model.costOffpeak)) / 高峰 \(fmtYuan(model.costPeak))", bold: true)
+      row("累计花费", fmtYuan(model.cumCost), bold: true)
 
       // 备注：今日/累计用量都只算本机（DeepSeek 无公开用量接口，全账户用量查不到）
       Text("注：今日/累计用量均仅统计这台电脑（余额为全账户）")
@@ -292,13 +279,13 @@ struct BalanceMenuView: View {
         row("今日请求", "\(model.today.calls) 次")
         row("今日输入", "\(fmtTokens(model.today.uncachedInput)) + 缓存\(fmtTokens(model.today.cacheRead))")
         row("今日输出", fmtTokens(model.today.output))
-        row("今日花费", "空闲 \(fmtYuan(todayCostOffpeak(model.today))) / 高峰 \(fmtYuan(todayCostPeak(model.today)))", bold: true)
+        row("今日花费", fmtYuan(model.today.cost), bold: true)
         Divider().padding(.vertical, 2)
       }
 
       row("累计输入", "\(fmtTokens(model.totals.uncachedInput)) + 缓存\(fmtTokens(model.totals.cacheRead))")
       row("累计输出", fmtTokens(model.totals.output))
-      row("累计花费", "空闲 \(fmtYuan(model.costOffpeak)) / 高峰 \(fmtYuan(model.costPeak))", bold: true)
+      row("累计花费", fmtYuan(model.cumCost), bold: true)
 
       Text("注：今日/累计用量均仅统计这台电脑（余额为全账户）")
         .font(.system(size: 9))

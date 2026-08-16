@@ -21,6 +21,7 @@ struct TodayUsage {
   var cacheRead: Int64 = 0
   var output: Int64 = 0
   var reasoning: Int64 = 0
+  var cost: Double = 0 // 今日花费（按每次请求的时间精确计价）
 }
 
 struct Report {
@@ -28,9 +29,9 @@ struct Report {
   var balanceError: String?
   var totals: Totals
   var today: TodayUsage
-  var costCurrent: Double
-  var costOffpeak: Double
-  var costPeak: Double
+  var costCurrent: Double   // 累计·老价估算（仅参考）
+  var todayCost: Double     // 今日·按请求时间精确
+  var cumCost: Double       // 累计·按请求时间精确
   var updatedAt: Date
   var model: String
 }
@@ -41,6 +42,28 @@ enum Prices {
   static let current = (cacheHit: 0.02, cacheMiss: 1.0, output: 2.0) // 老价（2026-08-17 前）
   static let offpeak = (cacheHit: 0.05, cacheMiss: 1.5, output: 4.5) // 现价·空闲（8/17 起）
   static let peak = (cacheHit: 0.10, cacheMiss: 3.0, output: 9.0) // 现价·高峰（8/17 起）
+
+  /// 高峰时段：北京时间每日 16:30–24:00（其余为空闲时段）
+  static let peakStartMinutes = 16 * 60 + 30
+  static let beijing = TimeZone(identifier: "Asia/Shanghai")!
+
+  /// 新价格生效时刻：北京时间 2026-08-17 00:00
+  static let newPriceDate: Date = {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = beijing
+    return cal.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 0))!
+  }()
+
+  /// 按请求时间取价：8/17 0 点前用老价；之后按请求时刻判断高峰(16:30-24:00)/空闲
+  static func price(for timeMs: Double) -> (cacheHit: Double, cacheMiss: Double, output: Double) {
+    let date = Date(timeIntervalSince1970: timeMs / 1000)
+    guard date >= newPriceDate else { return current }
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = beijing
+    let comps = cal.dateComponents([.hour, .minute], from: date)
+    let minutes = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+    return minutes >= peakStartMinutes ? peak : offpeak
+  }
 }
 
 // MARK: - 数据获取
@@ -123,12 +146,14 @@ enum DS {
     return out
   }
 
-  /// 今日精确用量：解析会话日志（zstd JSONL），统计本地零点起的 assistant/message usage
-  static func readToday() -> TodayUsage {
-    var out = TodayUsage()
+  /// 一次扫描全部会话日志：今日精确用量（含按请求时间精确计价的花费）+ 累计精确花费
+  /// （8/17 0 点前的请求按老价，之后按请求时刻的高峰/空闲价）
+  static func readTodayAndCumulativeCost() -> (today: TodayUsage, cumCost: Double) {
+    var today = TodayUsage()
+    var cumCost = 0.0
     let midnight = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
     let fm = FileManager.default
-    guard let wsDirs = try? fm.contentsOfDirectory(at: sessionsRoot, includingPropertiesForKeys: nil) else { return out }
+    guard let wsDirs = try? fm.contentsOfDirectory(at: sessionsRoot, includingPropertiesForKeys: nil) else { return (today, cumCost) }
     for ws in wsDirs {
       guard let sessionDirs = try? fm.contentsOfDirectory(at: ws, includingPropertiesForKeys: nil) else { continue }
       for sdir in sessionDirs {
@@ -138,19 +163,31 @@ enum DS {
           guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
             (obj["type"] as? String) == "assistant/message"
           else { continue }
-          guard let time = obj["time"] as? NSNumber, time.doubleValue >= midnight else { continue }
-          guard let data = obj["data"] as? [String: Any],
+          guard let time = obj["time"] as? NSNumber,
+            let data = obj["data"] as? [String: Any],
             let usage = data["usage"] as? [String: Any]
           else { continue }
-          out.calls += 1
-          out.uncachedInput += (usage["inputTokens"] as? NSNumber)?.int64Value ?? 0
-          out.output += (usage["outputTokens"] as? NSNumber)?.int64Value ?? 0
-          out.cacheRead += (usage["cacheReadTokens"] as? NSNumber)?.int64Value ?? 0
-          out.reasoning += (usage["reasoningTokens"] as? NSNumber)?.int64Value ?? 0
+          let timeMs = time.doubleValue
+          let uncached = (usage["inputTokens"] as? NSNumber)?.int64Value ?? 0
+          let cacheRead = (usage["cacheReadTokens"] as? NSNumber)?.int64Value ?? 0
+          let output = (usage["outputTokens"] as? NSNumber)?.int64Value ?? 0
+          let p = Prices.price(for: timeMs)
+          cumCost += Double(uncached) / 1e6 * p.cacheMiss
+            + Double(cacheRead) / 1e6 * p.cacheHit
+            + Double(output) / 1e6 * p.output
+          guard timeMs >= midnight else { continue }
+          today.calls += 1
+          today.uncachedInput += uncached
+          today.output += output
+          today.cacheRead += cacheRead
+          today.reasoning += (usage["reasoningTokens"] as? NSNumber)?.int64Value ?? 0
+          today.cost += Double(uncached) / 1e6 * p.cacheMiss
+            + Double(cacheRead) / 1e6 * p.cacheHit
+            + Double(output) / 1e6 * p.output
         }
       }
     }
-    return out
+    return (today, cumCost)
   }
 
   /// 定位 zstd 可执行文件（不同机器安装位置不同，兼容常见路径）
@@ -190,14 +227,15 @@ enum DS {
 // MARK: - 报告组装
 
 func buildReport() async -> Report {
+  let scan = DS.readTodayAndCumulativeCost()
   var rep = Report(
     balance: nil,
     balanceError: nil,
     totals: DS.readTotals(),
-    today: DS.readToday(),
+    today: scan.today,
     costCurrent: 0,
-    costOffpeak: 0,
-    costPeak: 0,
+    todayCost: scan.today.cost,
+    cumCost: scan.cumCost,
     updatedAt: Date(),
     model: "deepseek-v4-flash"
   )
@@ -205,12 +243,6 @@ func buildReport() async -> Report {
   rep.costCurrent = Double(t.uncachedInput) / 1e6 * Prices.current.cacheMiss
     + Double(t.cacheRead) / 1e6 * Prices.current.cacheHit
     + Double(t.output) / 1e6 * Prices.current.output
-  rep.costOffpeak = Double(t.uncachedInput) / 1e6 * Prices.offpeak.cacheMiss
-    + Double(t.cacheRead) / 1e6 * Prices.offpeak.cacheHit
-    + Double(t.output) / 1e6 * Prices.offpeak.output
-  rep.costPeak = Double(t.uncachedInput) / 1e6 * Prices.peak.cacheMiss
-    + Double(t.cacheRead) / 1e6 * Prices.peak.cacheHit
-    + Double(t.output) / 1e6 * Prices.peak.output
 
   if let key = DS.apiKey() {
     do {
