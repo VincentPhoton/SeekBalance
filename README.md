@@ -1,0 +1,86 @@
+# 💳 SeekBalance
+
+一个 macOS 菜单栏小工具：一眼看到 DeepSeek API 的**余额**、**今日用量**和**花费估算**。
+
+> 本项目由作者提出需求、使用 AI 辅助编写代码。
+
+![Platform](https://img.shields.io/badge/macOS-13%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
+
+---
+
+## 它有什么用？
+
+- 菜单栏常驻显示余额（如 `¥7.85`），不占 Dock，不弹窗打扰
+- 点击图标弹出面板：余额 / 充值 / 赠送、今日请求次数与 token、累计用量与花费
+- 每 10 分钟自动刷新；打开面板立即刷新
+- 深色/浅色模式自动适配，实心背景高对比度，小屏幕也一屏放下
+
+## 截图
+
+（欢迎提交截图，或直接安装体验）
+
+## 安装
+
+### 方式一：DMG 安装包（推荐）
+
+1. 从 [Releases](../../releases) 下载 `SeekBalance-1.0.dmg`
+2. 打开 DMG，把 `SeekBalance.app` 拖进"应用程序"
+3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
+4. DMG 里附带了"卸载SeekBalance"一键卸载程序（自动清理偏好与缓存）
+
+### 方式二：源码编译
+
+需要 macOS 13+ 和 Swift 5.9+：
+
+```sh
+cd SeekBalance
+SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
+# 自检（打印一次报告后退出）：
+./.build/release/SeekBalance --once
+```
+
+## 使用前提
+
+| 依赖 | 说明 |
+|---|---|
+| API 密钥 | 读取 `~/.dsh/.credentials.yaml` 中的 `DEEPSEEK_API_KEY`（与 [dsh](https://github.com/yingjunnan/dsh) 共用同一密钥）。没有 dsh 的用户手动创建该文件即可，格式：`DEEPSEEK_API_KEY: 你的密钥` |
+| zstd | 用于解压 dsh 会话日志。`brew install zstd`（Apple Silicon 在 `/opt/homebrew/bin/zstd`，Intel 在 `/usr/local/bin/zstd`，自动识别） |
+| dsh 会话记录（可选） | 有 dsh 用量统计；没有则"今日/累计用量"显示为空，仅余额可用 |
+
+## 数据来源与安全说明
+
+| 数据 | 来源 | 范围 |
+|---|---|---|
+| 余额 | `GET https://api.deepseek.com/user/balance`（Bearer 认证） | **全账户**，实时准确 |
+| 今日用量 | 本机 `~/.dsh/sessions/*/*/session.jsonl.zstd` 会话日志 | **仅本机** |
+| 累计用量 | 本机 `~/.dsh/storages/session_projcache.json` | **仅本机** |
+| 花费 | 按本地用量 × 当前/峰谷价估算 | **仅本机，非官方账单** |
+
+- 你的 API 密钥**只用于**请求 DeepSeek 官方接口（`api.deepseek.com`），不会发送到任何第三方
+- 本工具**不联网上传任何统计数据**，所有用量数据都来自你本地的 dsh 文件
+- DeepSeek **未提供公开的用量查询接口**（实测 `/user/usage` 等均返回 404），因此用量统计只能读取本机记录；全账户用量需网页后台私有接口，未采用
+
+## 功能细节
+
+- 菜单栏余额文字可开关（面板内"状态栏显示余额"）
+- 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
+- 自动刷新间隔 10 分钟；改动数据层后建议先跑自检
+
+## 卸载
+
+- 用安装包内附的"卸载SeekBalance"一键卸载，或手动删除 `/Applications/SeekBalance.app`
+- 手动卸载残留：`~/Library/Preferences/local.seekbalance.plist`、`~/Library/Caches/local.seekbalance/` 等
+- 卸载不会删除 `~/.dsh/` 数据（与 dsh 共用，请放心）
+
+## 开发者
+
+- 编译：`swift build -c release`
+- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.0.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
+
+## License
+
+[MIT](LICENSE)
+
+## 免责声明
+
+本项目与 DeepSeek 官方无任何关联，为第三方社区工具。花费估算仅供参考，实际扣费请以 DeepSeek 官方账单为准。

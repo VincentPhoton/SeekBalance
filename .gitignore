@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Swift 构建产物
+.build/
+
+# 打包产物 / 临时文件
+*.dmg
+dmg-build/
+
+# 个人交接文档（含本机路径，不公开）
+开发交接文档.md
