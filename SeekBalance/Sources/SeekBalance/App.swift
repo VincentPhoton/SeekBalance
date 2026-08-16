@@ -34,6 +34,8 @@ struct Main {
     } else {
       print("余额: 查询失败 - \(r.balanceError ?? "未知错误")")
     }
+    let p = currentPeriodInfo()
+    print("当前时段: \(p.currentRange)（距离\(p.nextIsPeak ? "高峰" : "空闲")\(fmtCountdown(p.secondsUntilNext))）")
     let t = r.totals
     print("累计: 输入(未命中) \(fmtTokens(t.uncachedInput)) / 缓存命中 \(fmtTokens(t.cacheRead)) / 输出 \(fmtTokens(t.output))")
     if r.today.calls > 0 {
@@ -60,6 +62,16 @@ func fmtTokens(_ n: Int64) -> String {
 
 func fmtYuan(_ n: Double) -> String {
   return "¥" + String(format: "%.4f", n)
+}
+
+/// 倒计时显示："还有 X 小时 Y 分"
+func fmtCountdown(_ seconds: TimeInterval) -> String {
+  let total = Int(seconds.rounded())
+  let h = total / 3600
+  let m = (total % 3600) / 60
+  if h > 0 { return "还有 \(h) 小时 \(m) 分" }
+  if m > 0 { return "还有 \(m) 分钟" }
+  return "即将切换"
 }
 
 // MARK: - 模型
@@ -186,6 +198,13 @@ struct BalancePanelView: View {
 
       Divider().padding(.vertical, 2)
 
+      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时
+      let period = currentPeriodInfo()
+      row("当前时段", period.currentRange)
+      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext))
+
+      Divider().padding(.vertical, 2)
+
       if model.today.calls > 0 {
         row("今日请求", "\(model.today.calls) 次")
         row("今日输入", "\(fmtTokens(model.today.uncachedInput)) + 缓存\(fmtTokens(model.today.cacheRead))")
@@ -274,6 +293,13 @@ struct BalanceMenuView: View {
           .disabled(model.apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         Text("仅存本机钥匙串").font(.system(size: 9)).foregroundColor(.secondary)
       }
+
+      Divider().padding(.vertical, 2)
+
+      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时
+      let period = currentPeriodInfo()
+      row("当前时段", period.currentRange)
+      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext))
 
       Divider().padding(.vertical, 2)
 

@@ -75,6 +75,60 @@ enum Prices {
   }
 }
 
+// MARK: - 时段状态（高峰/空闲）
+
+struct PeriodInfo {
+  var isPeakNow: Bool
+  var currentRange: String      // 如 "高峰 9:00–12:00"
+  var nextIsPeak: Bool          // 下一个切换到的状态是否高峰
+  var secondsUntilNext: TimeInterval
+}
+
+/// 当前时段信息（北京时间）：高峰 9:00–12:00、14:00–18:00，其余空闲
+func currentPeriodInfo(now: Date = Date()) -> PeriodInfo {
+  var cal = Calendar(identifier: .gregorian)
+  cal.timeZone = Prices.beijing
+  let comps = cal.dateComponents([.hour, .minute], from: now)
+  let minutes = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+  // 时段边界：09:00=540, 12:00=720, 14:00=840, 18:00=1080
+  let isPeak: Bool
+  let rangeText: String
+  let nextBoundary: Int
+  let nextIsPeak: Bool
+  if minutes < 540 { // 00:00–09:00 空闲 → 下一变化：09:00 转高峰
+    isPeak = false
+    rangeText = "空闲 00:00–09:00"
+    nextBoundary = 540
+    nextIsPeak = true
+  } else if minutes < 720 { // 09:00–12:00 高峰 → 12:00 转空闲
+    isPeak = true
+    rangeText = "高峰 09:00–12:00"
+    nextBoundary = 720
+    nextIsPeak = false
+  } else if minutes < 840 { // 12:00–14:00 空闲 → 14:00 转高峰
+    isPeak = false
+    rangeText = "空闲 12:00–14:00"
+    nextBoundary = 840
+    nextIsPeak = true
+  } else if minutes < 1080 { // 14:00–18:00 高峰 → 18:00 转空闲
+    isPeak = true
+    rangeText = "高峰 14:00–18:00"
+    nextBoundary = 1080
+    nextIsPeak = false
+  } else { // 18:00–24:00 空闲 → 下一变化：明天 09:00 转高峰
+    isPeak = false
+    rangeText = "空闲 18:00–24:00"
+    nextBoundary = 540 + 1440
+    nextIsPeak = true
+  }
+  return PeriodInfo(
+    isPeakNow: isPeak,
+    currentRange: rangeText,
+    nextIsPeak: nextIsPeak,
+    secondsUntilNext: TimeInterval(nextBoundary - minutes) * 60
+  )
+}
+
 // MARK: - 数据获取
 
 enum DS {
