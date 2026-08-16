@@ -43,8 +43,11 @@ enum Prices {
   static let offpeak = (cacheHit: 0.05, cacheMiss: 1.5, output: 4.5) // 现价·空闲（8/17 起）
   static let peak = (cacheHit: 0.10, cacheMiss: 3.0, output: 9.0) // 现价·高峰（8/17 起）
 
-  /// 高峰时段：北京时间每日 16:30–24:00（其余为空闲时段）
-  static let peakStartMinutes = 16 * 60 + 30
+  /// 高峰时段（北京时间）：每日 9:00–12:00、14:00–18:00；其余为空闲时段
+  static func isPeak(_ minutes: Int) -> Bool {
+    return (minutes >= 9 * 60 && minutes < 12 * 60)
+      || (minutes >= 14 * 60 && minutes < 18 * 60)
+  }
   static let beijing = TimeZone(identifier: "Asia/Shanghai")!
 
   /// 新价格生效时刻：北京时间 2026-08-17 00:00
@@ -54,7 +57,7 @@ enum Prices {
     return cal.date(from: DateComponents(year: 2026, month: 8, day: 17, hour: 0))!
   }()
 
-  /// 按请求时间取价：8/17 0 点前用老价；之后按请求时刻判断高峰(16:30-24:00)/空闲
+  /// 按请求时间取价：8/17 0 点前用老价；之后按请求时刻判断高峰（9-12、14-18）/空闲
   static func price(for timeMs: Double) -> (cacheHit: Double, cacheMiss: Double, output: Double) {
     let date = Date(timeIntervalSince1970: timeMs / 1000)
     guard date >= newPriceDate else { return current }
@@ -62,7 +65,7 @@ enum Prices {
     cal.timeZone = beijing
     let comps = cal.dateComponents([.hour, .minute], from: date)
     let minutes = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-    return minutes >= peakStartMinutes ? peak : offpeak
+    return isPeak(minutes) ? peak : offpeak
   }
 }
 
