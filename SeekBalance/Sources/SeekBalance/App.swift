@@ -198,10 +198,11 @@ struct BalancePanelView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时（高峰红、空闲绿）
+      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时
+      // 颜色：第一行=当前状态色（空闲绿/高峰红）；第二行=警示色（空闲快结束→红提醒，高峰快结束→绿宽慰）
       let period = currentPeriodInfo()
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
-      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemGreen) : Color(nsColor: .systemRed))
 
       Divider().padding(.vertical, 2)
 
@@ -298,10 +299,11 @@ struct BalanceMenuView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时（高峰红、空闲绿）
+      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时
+      // 颜色：第一行=当前状态色（空闲绿/高峰红）；第二行=警示色（空闲快结束→红提醒，高峰快结束→绿宽慰）
       let period = currentPeriodInfo()
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
-      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemGreen) : Color(nsColor: .systemRed))
 
       Divider().padding(.vertical, 2)
 
