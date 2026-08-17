@@ -218,16 +218,43 @@ final class BalanceModel: ObservableObject {
       do {
         let info = try await fetchLatestRelease()
         let latest = info.tag.replacingOccurrences(of: "v", with: "")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckTime")
         guard versionCompare(latest, currentVersion) > 0 else {
-          updateStatus = .upToDate
+          // 已是最新：屏幕中央弹窗提示（含上次检查更新时间）
+          updateStatus = .idle
+          showUpdateDialog(
+            title: "已是最新版本",
+            message: "当前版本：v\(currentVersion)\n上次检查更新：\(lastCheckTimeText())"
+          )
           return
         }
         updateStatus = .updateAvailable(latest)
         try await performUpdate(dmgURL: info.assetURL, version: latest)
       } catch {
-        updateStatus = .failed(error.localizedDescription)
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckTime")
+        updateStatus = .idle
+        showUpdateDialog(title: "检查更新失败", message: error.localizedDescription)
       }
     }
+  }
+
+  /// 屏幕中央弹窗（NSAlert，模态）
+  private func showUpdateDialog(title: String, message: String) {
+    let alert = NSAlert()
+    alert.messageText = title
+    alert.informativeText = message
+    alert.addButton(withTitle: "好的")
+    alert.alertStyle = .informational
+    alert.runModal()
+  }
+
+  /// 上次检查更新的时间
+  private func lastCheckTimeText() -> String {
+    let t = UserDefaults.standard.double(forKey: "lastUpdateCheckTime")
+    guard t > 0 else { return "从未" }
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm"
+    return f.string(from: Date(timeIntervalSince1970: t))
   }
 
   private func fetchLatestRelease() async throws -> (tag: String, assetURL: URL) {
