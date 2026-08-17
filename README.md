@@ -20,7 +20,7 @@
 菜单栏显示余额，点击弹出面板（点击图片可看大图）：
 
 <p align="center">
-  <img src="screenshots/panel.png" alt="面板详情" width="55%">
+  <img src="screenshots/panel.png" alt="面板详情" width="40%">
 </p>
 
 ## 安装
