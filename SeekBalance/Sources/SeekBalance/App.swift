@@ -535,23 +535,18 @@ struct BalancePanelView: View {
         .onAppear { minutesText = "\(reminderMinutes)" }
       }
 
-      HStack(spacing: 12) {
+      HStack(spacing: 8) {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
-      }
-      .controlSize(.small)
-      .padding(.top, 1)
-
-      // 版本号（点击跳转 GitHub 主页）+ 检查更新
-      HStack(spacing: 6) {
+        Spacer(minLength: 4)
         Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
-        Text("·").font(.system(size: 9)).foregroundColor(.secondary)
         Button("检查更新") { model.checkForUpdate() }
           .controlSize(.small)
           .font(.system(size: 9))
       }
-      .padding(.top, 2)
+      .controlSize(.small)
+      .padding(.top, 1)
       if model.updateStatus != .idle {
         Text(updateStatusText(model.updateStatus))
           .font(.system(size: 9))
@@ -705,22 +700,17 @@ struct BalanceMenuView: View {
         .onAppear { minutesText = "\(reminderMinutes)" }
       }
 
-      HStack(spacing: 10) {
+      HStack(spacing: 8) {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
-      }
-      .controlSize(.small)
-      .padding(.top, 2)
-
-      // 版本号（点击跳转 GitHub 主页）+ 检查更新
-      HStack(spacing: 6) {
+        Spacer(minLength: 4)
         Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
-        Text("·").font(.system(size: 9)).foregroundColor(.secondary)
         Button("检查更新") { model.checkForUpdate() }
           .controlSize(.small)
           .font(.system(size: 9))
       }
+      .controlSize(.small)
       .padding(.top, 2)
       if model.updateStatus != .idle {
         Text(updateStatusText(model.updateStatus))
