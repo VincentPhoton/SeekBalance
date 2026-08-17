@@ -539,10 +539,10 @@ struct BalancePanelView: View {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
         Spacer(minLength: 4)
-        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
-          .font(.system(size: 9))
         Button("检查更新") { model.checkForUpdate() }
           .controlSize(.small)
+          .font(.system(size: 9))
+        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
       }
       .controlSize(.small)
@@ -704,10 +704,10 @@ struct BalanceMenuView: View {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
         Spacer(minLength: 4)
-        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
-          .font(.system(size: 9))
         Button("检查更新") { model.checkForUpdate() }
           .controlSize(.small)
+          .font(.system(size: 9))
+        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
       }
       .controlSize(.small)
