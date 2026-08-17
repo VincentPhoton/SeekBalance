@@ -29,6 +29,7 @@ struct Main {
 
   static func printReport(_ r: Report) {
     print("DeepSeek 用量 & 余额报告（\(r.model)）")
+    print("版本: v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
     print("==================================================")
     if let b = r.balance {
       print("余额: ¥\(String(format: "%.2f", b.total))（充值 ¥\(String(format: "%.2f", b.toppedUp)) / 赠送 ¥\(String(format: "%.2f", b.granted))）")
@@ -89,6 +90,41 @@ func requestNotificationPermission() {
   UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
 }
 
+// MARK: - 更新状态
+
+enum UpdateStatus: Equatable {
+  case idle
+  case checking
+  case upToDate
+  case updateAvailable(String)
+  case downloading
+  case installing
+  case done(String)
+  case failed(String)
+}
+
+func updateStatusText(_ s: UpdateStatus) -> String {
+  switch s {
+  case .idle: return ""
+  case .checking: return "正在检查更新…"
+  case .upToDate: return "已是最新版本 ✅"
+  case .updateAvailable(let v): return "发现新版本 v\(v)，开始更新…"
+  case .downloading: return "正在下载更新…"
+  case .installing: return "正在安装更新…"
+  case .done(let v): return "更新已完成（v\(v)）✅"
+  case .failed(let msg): return "更新失败：\(msg)"
+  }
+}
+
+func updateStatusColor(_ s: UpdateStatus) -> Color {
+  switch s {
+  case .failed: return Color(nsColor: .systemRed)
+  case .done, .upToDate: return Color(nsColor: .systemGreen)
+  case .downloading, .installing, .checking, .updateAvailable: return Color(nsColor: .systemOrange)
+  case .idle: return Color.secondary
+  }
+}
+
 // MARK: - 模型
 
 @MainActor
@@ -105,6 +141,7 @@ final class BalanceModel: ObservableObject {
   // 密钥相关：缺失时面板显示粘贴框；apiKeyInput 是用户输入的密钥
   @Published var keyMissing = false
   @Published var apiKeyInput = ""
+  @Published var updateStatus: UpdateStatus = .idle
   private var timer: Timer?
   private var reminderTimer: Timer?
 
@@ -115,6 +152,7 @@ final class BalanceModel: ObservableObject {
 
   /// 高峰前提醒：每 30 秒检查一次，进入提醒窗口（空闲时段且距下一高峰 ≤ 设定分钟）就发通知
   func startReminderTimer() {
+    notifyUpdateDoneIfNeeded()
     if UserDefaults.standard.bool(forKey: "peakReminderEnabled") {
       UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
@@ -162,6 +200,144 @@ final class BalanceModel: ObservableObject {
       trigger: nil
     )
     UNUserNotificationCenter.current().add(request)
+  }
+
+  // MARK: - 版本与自动更新
+
+  var currentVersion: String {
+    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1"
+  }
+
+  /// 检查更新：查 GitHub 最新 Release，有新版则自动下载安装并重启
+  func checkForUpdate() {
+    if case .downloading = updateStatus { return }
+    if case .installing = updateStatus { return }
+    if case .checking = updateStatus { return }
+    updateStatus = .checking
+    Task {
+      do {
+        let info = try await fetchLatestRelease()
+        let latest = info.tag.replacingOccurrences(of: "v", with: "")
+        guard versionCompare(latest, currentVersion) > 0 else {
+          updateStatus = .upToDate
+          return
+        }
+        updateStatus = .updateAvailable(latest)
+        try await performUpdate(dmgURL: info.assetURL, version: latest)
+      } catch {
+        updateStatus = .failed(error.localizedDescription)
+      }
+    }
+  }
+
+  private func fetchLatestRelease() async throws -> (tag: String, assetURL: URL) {
+    var req = URLRequest(url: URL(string: "https://api.github.com/repos/VincentPhoton/SeekBalance/releases/latest")!)
+    req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+    let (data, resp) = try await URLSession.shared.data(for: req)
+    guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+      throw NSError(domain: "update", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法连接 GitHub"])
+    }
+    let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    guard let tag = obj?["tag_name"] as? String,
+      let assets = obj?["assets"] as? [[String: Any]],
+      let asset = assets.first(where: { ($0["name"] as? String)?.contains("arm64") == true }),
+      let urlString = asset["browser_download_url"] as? String,
+      let url = URL(string: urlString)
+    else {
+      throw NSError(domain: "update", code: -2, userInfo: [NSLocalizedDescriptionKey: "未找到安装包"])
+    }
+    return (tag, url)
+  }
+
+  /// 比较 "1.1" / "1.2.1" 等版本号：a>b 返回 1，相等 0，小于 -1
+  private func versionCompare(_ a: String, _ b: String) -> Int {
+    let pa = a.split(separator: ".").compactMap { Int($0) }
+    let pb = b.split(separator: ".").compactMap { Int($0) }
+    for i in 0..<max(pa.count, pb.count) {
+      let x = i < pa.count ? pa[i] : 0
+      let y = i < pb.count ? pb[i] : 0
+      if x != y { return x > y ? 1 : -1 }
+    }
+    return 0
+  }
+
+  /// 自动更新：下载 DMG → 挂载 → 替换 /Applications/SeekBalance.app → 杀旧进程并重启新版
+  private func performUpdate(dmgURL: URL, version: String) async throws {
+    updateStatus = .downloading
+    let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("SeekBalance-update.dmg")
+    try? FileManager.default.removeItem(at: tmp)
+    let (downloadURL, _) = try await URLSession.shared.download(from: dmgURL)
+    try? FileManager.default.removeItem(at: tmp)
+    try FileManager.default.moveItem(at: downloadURL, to: tmp)
+
+    updateStatus = .installing
+    let mountPoint = try await mountDMG(tmp)
+    try await shell("rm -rf \(shq("/Applications/SeekBalance.app")) && cp -R \(shq(mountPoint + "/SeekBalance.app")) /Applications/SeekBalance.app")
+    try await shell("hdiutil detach \(shq(mountPoint)) -force")
+    try? FileManager.default.removeItem(at: tmp)
+
+    // 标记刚更新：新版启动时弹"更新已完成"通知
+    UserDefaults.standard.set(version, forKey: "justUpdatedVersion")
+
+    // 启动自毁重开脚本（延迟 1 秒杀掉旧进程，再打开新版）
+    let helper = FileManager.default.temporaryDirectory.appendingPathComponent("seekbalance-relaunch.sh")
+    let script = "#!/bin/sh\nsleep 1\npkill -x SeekBalance\nsleep 0.5\nopen /Applications/SeekBalance.app\n"
+    try? script.write(to: helper, atomically: true, encoding: .utf8)
+    try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: helper.path)
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/bin/sh")
+    proc.arguments = [helper.path]
+    try? proc.run()
+    updateStatus = .done(version)
+  }
+
+  /// 挂载 DMG 并解析挂载点
+  private func mountDMG(_ dmg: URL) async throws -> String {
+    let output = try await shell("/usr/bin/hdiutil attach -nobrowse -readonly \(shq(dmg.path)) -plist")
+    guard let data = output.data(using: .utf8),
+      let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+      let entities = obj["system-entities"] as? [[String: Any]]
+    else {
+      throw NSError(domain: "update", code: -3, userInfo: [NSLocalizedDescriptionKey: "无法挂载安装包"])
+    }
+    for e in entities {
+      if let mp = e["mount-point"] as? String { return mp }
+    }
+    throw NSError(domain: "update", code: -3, userInfo: [NSLocalizedDescriptionKey: "无法挂载安装包"])
+  }
+
+  /// 在后台线程跑 shell 命令并返回输出（先读 stdout 再 wait，避免管道死锁）
+  private func shell(_ cmd: String) async throws -> String {
+    try await Task.detached(priority: .userInitiated) {
+      let p = Process()
+      p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+      p.arguments = ["-c", cmd]
+      let outPipe = Pipe()
+      let errPipe = Pipe()
+      p.standardOutput = outPipe
+      p.standardError = errPipe
+      try p.run()
+      let out = outPipe.fileHandleForReading.readDataToEndOfFile()
+      _ = errPipe.fileHandleForReading.readDataToEndOfFile()
+      p.waitUntilExit()
+      return String(data: out, encoding: .utf8) ?? ""
+    }.value
+  }
+
+  private func shq(_ s: String) -> String {
+    "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  }
+
+  /// 新版启动时提示"更新已完成"
+  private func notifyUpdateDoneIfNeeded() {
+    let d = UserDefaults.standard
+    guard let v = d.string(forKey: "justUpdatedVersion") else { return }
+    d.removeObject(forKey: "justUpdatedVersion")
+    let content = UNMutableNotificationContent()
+    content.title = "✅ 更新已完成"
+    content.body = "SeekBalance 已自动更新到 v\(v)，现在使用的是最新版。"
+    content.sound = .default
+    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "updated-\(UUID().uuidString)", content: content, trigger: nil))
   }
 
   var balanceText: String {
@@ -366,6 +542,23 @@ struct BalancePanelView: View {
       .controlSize(.small)
       .padding(.top, 1)
 
+      // 版本号（点击跳转 GitHub 主页）+ 检查更新
+      HStack(spacing: 6) {
+        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
+          .font(.system(size: 9))
+        Text("·").font(.system(size: 9)).foregroundColor(.secondary)
+        Button("检查更新") { model.checkForUpdate() }
+          .controlSize(.small)
+          .font(.system(size: 9))
+      }
+      .padding(.top, 2)
+      if model.updateStatus != .idle {
+        Text(updateStatusText(model.updateStatus))
+          .font(.system(size: 9))
+          .foregroundColor(updateStatusColor(model.updateStatus))
+          .padding(.top, 1)
+      }
+
       if let t = model.lastUpdated {
         Text("更新于 " + t.formatted(date: .omitted, time: .standard))
           .font(.system(size: 9))
@@ -518,6 +711,23 @@ struct BalanceMenuView: View {
       }
       .controlSize(.small)
       .padding(.top, 2)
+
+      // 版本号（点击跳转 GitHub 主页）+ 检查更新
+      HStack(spacing: 6) {
+        Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
+          .font(.system(size: 9))
+        Text("·").font(.system(size: 9)).foregroundColor(.secondary)
+        Button("检查更新") { model.checkForUpdate() }
+          .controlSize(.small)
+          .font(.system(size: 9))
+      }
+      .padding(.top, 2)
+      if model.updateStatus != .idle {
+        Text(updateStatusText(model.updateStatus))
+          .font(.system(size: 9))
+          .foregroundColor(updateStatusColor(model.updateStatus))
+          .padding(.top, 1)
+      }
 
       if let t = model.lastUpdated {
         Text("更新于 " + t.formatted(date: .omitted, time: .standard))
