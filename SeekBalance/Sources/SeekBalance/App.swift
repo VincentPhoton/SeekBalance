@@ -236,6 +236,7 @@ struct BalancePanelView: View {
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
   @State private var minutesText = "15"
+  @FocusState private var minutesFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
@@ -281,52 +282,6 @@ struct BalancePanelView: View {
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
       row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: warnSoon ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
-      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
-      Toggle("高峰前提醒", isOn: $reminderEnabled)
-        .controlSize(.small)
-        .padding(.vertical, 1)
-        .onChange(of: reminderEnabled) { enabled in
-          if enabled { requestNotificationPermission() }
-        }
-      if reminderEnabled {
-        HStack(spacing: 6) {
-          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
-            .font(.system(size: 10))
-            .fixedSize()
-          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
-          Slider(
-            value: Binding(
-              get: { Double(reminderMinutes) },
-              set: { newValue in
-                reminderMinutes = Int(newValue.rounded())
-                minutesText = "\(reminderMinutes)"
-              }
-            ),
-            in: 0...60,
-            step: 1
-          )
-          .controlSize(.small)
-          TextField("0", text: $minutesText)
-            .frame(width: 34)
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .multilineTextAlignment(.center)
-            .onChange(of: minutesText) { newValue in
-              let digits = newValue.filter { $0.isNumber }
-              if let v = Int(digits) {
-                let clamped = min(max(v, 0), 60)
-                reminderMinutes = clamped
-                if clamped != v { minutesText = "\(clamped)" }
-              }
-            }
-          if reminderMinutes > 0 {
-            Text("分钟").font(.system(size: 10)).fixedSize()
-          }
-        }
-        .padding(.vertical, 1)
-        .onAppear { minutesText = "\(reminderMinutes)" }
-      }
-
       Divider().padding(.vertical, 2)
 
       if model.today.calls > 0 {
@@ -353,9 +308,59 @@ struct BalancePanelView: View {
       Toggle("状态栏显示余额", isOn: $showBalanceText)
         .controlSize(.small)
         .padding(.vertical, 1)
+        .onChange(of: showBalanceText) { _ in minutesFocused = false }
+
+      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
+      Toggle("高峰前提醒", isOn: $reminderEnabled)
+        .controlSize(.small)
+        .padding(.vertical, 1)
+        .onChange(of: reminderEnabled) { enabled in
+          minutesFocused = false
+          if enabled { requestNotificationPermission() }
+        }
+      if reminderEnabled {
+        HStack(spacing: 6) {
+          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
+            .font(.system(size: 10))
+            .fixedSize()
+          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
+          Slider(
+            value: Binding(
+              get: { Double(reminderMinutes) },
+              set: { newValue in
+                reminderMinutes = Int(newValue.rounded())
+                minutesText = "\(reminderMinutes)"
+                minutesFocused = false
+              }
+            ),
+            in: 0...60,
+            step: 1
+          )
+          .controlSize(.small)
+          TextField("0", text: $minutesText)
+            .frame(width: 34)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .multilineTextAlignment(.center)
+            .focused($minutesFocused)
+            .onChange(of: minutesText) { newValue in
+              let digits = newValue.filter { $0.isNumber }
+              if let v = Int(digits) {
+                let clamped = min(max(v, 0), 60)
+                reminderMinutes = clamped
+                if clamped != v { minutesText = "\(clamped)" }
+              }
+            }
+          if reminderMinutes > 0 {
+            Text("分钟").font(.system(size: 10)).fixedSize()
+          }
+        }
+        .padding(.vertical, 1)
+        .onAppear { minutesText = "\(reminderMinutes)" }
+      }
 
       HStack(spacing: 12) {
-        Button("🔄 刷新") { model.refresh() }
+        Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
       }
       .controlSize(.small)
@@ -373,6 +378,8 @@ struct BalancePanelView: View {
     // 实心背景 + 系统标签色：浅色=黑字/白底，深色=白字/黑底，永远可读
     .background(Color(nsColor: .windowBackgroundColor))
     .foregroundColor(Color(nsColor: .labelColor))
+    // 点击面板空白处时取消数字框选中
+    .onTapGesture { minutesFocused = false }
     .onAppear { model.start() }
   }
 
@@ -393,6 +400,7 @@ struct BalanceMenuView: View {
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
   @State private var minutesText = "15"
+  @FocusState private var minutesFocused: Bool
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -433,52 +441,6 @@ struct BalanceMenuView: View {
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
       row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: warnSoon ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
-      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
-      Toggle("高峰前提醒", isOn: $reminderEnabled)
-        .controlSize(.small)
-        .padding(.vertical, 1)
-        .onChange(of: reminderEnabled) { enabled in
-          if enabled { requestNotificationPermission() }
-        }
-      if reminderEnabled {
-        HStack(spacing: 6) {
-          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
-            .font(.system(size: 10))
-            .fixedSize()
-          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
-          Slider(
-            value: Binding(
-              get: { Double(reminderMinutes) },
-              set: { newValue in
-                reminderMinutes = Int(newValue.rounded())
-                minutesText = "\(reminderMinutes)"
-              }
-            ),
-            in: 0...60,
-            step: 1
-          )
-          .controlSize(.small)
-          TextField("0", text: $minutesText)
-            .frame(width: 34)
-            .textFieldStyle(.roundedBorder)
-            .controlSize(.small)
-            .multilineTextAlignment(.center)
-            .onChange(of: minutesText) { newValue in
-              let digits = newValue.filter { $0.isNumber }
-              if let v = Int(digits) {
-                let clamped = min(max(v, 0), 60)
-                reminderMinutes = clamped
-                if clamped != v { minutesText = "\(clamped)" }
-              }
-            }
-          if reminderMinutes > 0 {
-            Text("分钟").font(.system(size: 10)).fixedSize()
-          }
-        }
-        .padding(.vertical, 1)
-        .onAppear { minutesText = "\(reminderMinutes)" }
-      }
-
       Divider().padding(.vertical, 2)
 
       if model.today.calls > 0 {
@@ -501,8 +463,57 @@ struct BalanceMenuView: View {
 
       Divider().padding(.vertical, 2)
 
+      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
+      Toggle("高峰前提醒", isOn: $reminderEnabled)
+        .controlSize(.small)
+        .padding(.vertical, 1)
+        .onChange(of: reminderEnabled) { enabled in
+          minutesFocused = false
+          if enabled { requestNotificationPermission() }
+        }
+      if reminderEnabled {
+        HStack(spacing: 6) {
+          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
+            .font(.system(size: 10))
+            .fixedSize()
+          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
+          Slider(
+            value: Binding(
+              get: { Double(reminderMinutes) },
+              set: { newValue in
+                reminderMinutes = Int(newValue.rounded())
+                minutesText = "\(reminderMinutes)"
+                minutesFocused = false
+              }
+            ),
+            in: 0...60,
+            step: 1
+          )
+          .controlSize(.small)
+          TextField("0", text: $minutesText)
+            .frame(width: 34)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .multilineTextAlignment(.center)
+            .focused($minutesFocused)
+            .onChange(of: minutesText) { newValue in
+              let digits = newValue.filter { $0.isNumber }
+              if let v = Int(digits) {
+                let clamped = min(max(v, 0), 60)
+                reminderMinutes = clamped
+                if clamped != v { minutesText = "\(clamped)" }
+              }
+            }
+          if reminderMinutes > 0 {
+            Text("分钟").font(.system(size: 10)).fixedSize()
+          }
+        }
+        .padding(.vertical, 1)
+        .onAppear { minutesText = "\(reminderMinutes)" }
+      }
+
       HStack(spacing: 10) {
-        Button("🔄 刷新") { model.refresh() }
+        Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
       }
       .controlSize(.small)
@@ -520,6 +531,8 @@ struct BalanceMenuView: View {
     .background(Color(nsColor: .windowBackgroundColor))
     // 系统标签色：浅色模式=黑、深色模式=白，自动适配
     .foregroundColor(Color(nsColor: .labelColor))
+    // 点击面板空白处时取消数字框选中
+    .onTapGesture { minutesFocused = false }
     .onAppear { model.start() }
   }
 
