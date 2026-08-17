@@ -235,6 +235,7 @@ struct BalancePanelView: View {
   @Binding var showBalanceText: Bool
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
+  @State private var minutesText = "15"
 
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
@@ -288,9 +289,42 @@ struct BalancePanelView: View {
           if enabled { requestNotificationPermission() }
         }
       if reminderEnabled {
-        Stepper(reminderMinutes == 0 ? "高峰开始时提醒" : "提前 \(reminderMinutes) 分钟提醒", value: $reminderMinutes, in: 0...60)
+        HStack(spacing: 6) {
+          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
+            .font(.system(size: 10))
+            .fixedSize()
+          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
+          Slider(
+            value: Binding(
+              get: { Double(reminderMinutes) },
+              set: { newValue in
+                reminderMinutes = Int(newValue.rounded())
+                minutesText = "\(reminderMinutes)"
+              }
+            ),
+            in: 0...60,
+            step: 1
+          )
           .controlSize(.small)
-          .padding(.vertical, 1)
+          TextField("0", text: $minutesText)
+            .frame(width: 34)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .multilineTextAlignment(.center)
+            .onChange(of: minutesText) { newValue in
+              let digits = newValue.filter { $0.isNumber }
+              if let v = Int(digits) {
+                let clamped = min(max(v, 0), 60)
+                reminderMinutes = clamped
+                if clamped != v { minutesText = "\(clamped)" }
+              }
+            }
+          if reminderMinutes > 0 {
+            Text("分钟").font(.system(size: 10)).fixedSize()
+          }
+        }
+        .padding(.vertical, 1)
+        .onAppear { minutesText = "\(reminderMinutes)" }
       }
 
       Divider().padding(.vertical, 2)
@@ -358,6 +392,7 @@ struct BalanceMenuView: View {
   @ObservedObject var model: BalanceModel
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
+  @State private var minutesText = "15"
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -406,9 +441,42 @@ struct BalanceMenuView: View {
           if enabled { requestNotificationPermission() }
         }
       if reminderEnabled {
-        Stepper(reminderMinutes == 0 ? "高峰开始时提醒" : "提前 \(reminderMinutes) 分钟提醒", value: $reminderMinutes, in: 0...60)
+        HStack(spacing: 6) {
+          Text(reminderMinutes == 0 ? "高峰开始时" : "提前")
+            .font(.system(size: 10))
+            .fixedSize()
+          // 滑块与数字框双向联动：拖滑块改数字，改数字滑块跟着动
+          Slider(
+            value: Binding(
+              get: { Double(reminderMinutes) },
+              set: { newValue in
+                reminderMinutes = Int(newValue.rounded())
+                minutesText = "\(reminderMinutes)"
+              }
+            ),
+            in: 0...60,
+            step: 1
+          )
           .controlSize(.small)
-          .padding(.vertical, 1)
+          TextField("0", text: $minutesText)
+            .frame(width: 34)
+            .textFieldStyle(.roundedBorder)
+            .controlSize(.small)
+            .multilineTextAlignment(.center)
+            .onChange(of: minutesText) { newValue in
+              let digits = newValue.filter { $0.isNumber }
+              if let v = Int(digits) {
+                let clamped = min(max(v, 0), 60)
+                reminderMinutes = clamped
+                if clamped != v { minutesText = "\(clamped)" }
+              }
+            }
+          if reminderMinutes > 0 {
+            Text("分钟").font(.system(size: 10)).fixedSize()
+          }
+        }
+        .padding(.vertical, 1)
+        .onAppear { minutesText = "\(reminderMinutes)" }
       }
 
       Divider().padding(.vertical, 2)
