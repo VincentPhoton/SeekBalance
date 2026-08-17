@@ -35,7 +35,7 @@ struct Main {
       print("余额: 查询失败 - \(r.balanceError ?? "未知错误")")
     }
     let p = currentPeriodInfo()
-    print("当前时段: \(p.currentRange)（距离\(p.nextIsPeak ? "高峰" : "空闲")\(fmtCountdown(p.secondsUntilNext))）")
+    print("当前时段: \(p.currentRange)（距离\(p.isPeakNow ? "高峰" : "空闲")结束\(fmtCountdown(p.secondsUntilNext))）")
     let t = r.totals
     print("累计: 输入(未命中) \(fmtTokens(t.uncachedInput)) / 缓存命中 \(fmtTokens(t.cacheRead)) / 输出 \(fmtTokens(t.output))")
     if r.today.calls > 0 {
@@ -198,10 +198,10 @@ struct BalancePanelView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时（高峰红、空闲绿）
+      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时（高峰红、空闲绿）
       let period = currentPeriodInfo()
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
-      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext), valueColor: period.nextIsPeak ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
       Divider().padding(.vertical, 2)
 
@@ -298,10 +298,10 @@ struct BalanceMenuView: View {
 
       Divider().padding(.vertical, 2)
 
-      // 当前时段：高峰/空闲 + 距下一时段切换的倒计时（高峰红、空闲绿）
+      // 当前时段：高峰/空闲 + 距当前时段结束的倒计时（高峰红、空闲绿）
       let period = currentPeriodInfo()
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
-      row("距离\(period.nextIsPeak ? "高峰" : "空闲")", fmtCountdown(period.secondsUntilNext), valueColor: period.nextIsPeak ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+      row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
 
       Divider().padding(.vertical, 2)
 

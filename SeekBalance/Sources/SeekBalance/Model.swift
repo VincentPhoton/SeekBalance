@@ -80,8 +80,7 @@ enum Prices {
 struct PeriodInfo {
   var isPeakNow: Bool
   var currentRange: String      // 如 "高峰 9:00–12:00"
-  var nextIsPeak: Bool          // 下一个切换到的状态是否高峰
-  var secondsUntilNext: TimeInterval
+  var secondsUntilNext: TimeInterval // 距当前时段结束还有多久（即下一次状态切换）
 }
 
 /// 当前时段信息（北京时间）：高峰 9:00–12:00、14:00–18:00，其余空闲
@@ -93,39 +92,32 @@ func currentPeriodInfo(now: Date = Date()) -> PeriodInfo {
   // 时段边界：09:00=540, 12:00=720, 14:00=840, 18:00=1080
   let isPeak: Bool
   let rangeText: String
-  let nextBoundary: Int
-  let nextIsPeak: Bool
-  if minutes < 540 { // 00:00–09:00 空闲 → 下一变化：09:00 转高峰
+  let endBoundary: Int
+  if minutes < 540 { // 00:00–09:00 空闲
     isPeak = false
     rangeText = "空闲 00:00–09:00"
-    nextBoundary = 540
-    nextIsPeak = true
-  } else if minutes < 720 { // 09:00–12:00 高峰 → 12:00 转空闲
+    endBoundary = 540
+  } else if minutes < 720 { // 09:00–12:00 高峰
     isPeak = true
     rangeText = "高峰 09:00–12:00"
-    nextBoundary = 720
-    nextIsPeak = false
-  } else if minutes < 840 { // 12:00–14:00 空闲 → 14:00 转高峰
+    endBoundary = 720
+  } else if minutes < 840 { // 12:00–14:00 空闲
     isPeak = false
     rangeText = "空闲 12:00–14:00"
-    nextBoundary = 840
-    nextIsPeak = true
-  } else if minutes < 1080 { // 14:00–18:00 高峰 → 18:00 转空闲
+    endBoundary = 840
+  } else if minutes < 1080 { // 14:00–18:00 高峰
     isPeak = true
     rangeText = "高峰 14:00–18:00"
-    nextBoundary = 1080
-    nextIsPeak = false
-  } else { // 18:00–24:00 空闲 → 下一变化：明天 09:00 转高峰
+    endBoundary = 1080
+  } else { // 18:00–次日09:00 连续空闲（跨零点，18:00→24:00→09:00 都是空闲）
     isPeak = false
-    rangeText = "空闲 18:00–24:00"
-    nextBoundary = 540 + 1440
-    nextIsPeak = true
+    rangeText = "空闲 18:00–次日 09:00"
+    endBoundary = 540 + 1440
   }
   return PeriodInfo(
     isPeakNow: isPeak,
     currentRange: rangeText,
-    nextIsPeak: nextIsPeak,
-    secondsUntilNext: TimeInterval(nextBoundary - minutes) * 60
+    secondsUntilNext: TimeInterval(endBoundary - minutes) * 60
   )
 }
 
