@@ -6,6 +6,8 @@
 
 ![Platform](https://img.shields.io/badge/macOS-13%2B-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Swift](https://img.shields.io/badge/Swift-5.9-orange) [![Download](https://img.shields.io/badge/下载-最新版-brightgreen)](https://github.com/VincentPhoton/SeekBalance/releases/latest)
 
+**简体中文** · [English](README.en.md)
+
 ---
 
 ## 它有什么用？
