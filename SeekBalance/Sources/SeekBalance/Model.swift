@@ -121,6 +121,23 @@ func currentPeriodInfo(now: Date = Date()) -> PeriodInfo {
   )
 }
 
+/// 下一个高峰开始时间（北京时间，每天 9:00 / 14:00）
+func nextPeakStart(after date: Date = Date()) -> Date? {
+  var cal = Calendar(identifier: .gregorian)
+  cal.timeZone = Prices.beijing
+  var candidates: [Date] = []
+  for hour in [9, 14] {
+    if let d = cal.date(bySettingHour: hour, minute: 0, second: 0, of: date) {
+      candidates.append(d)
+    }
+  }
+  if let tomorrow = cal.date(byAdding: .day, value: 1, to: date),
+    let d = cal.date(bySettingHour: 9, minute: 0, second: 0, of: tomorrow) {
+    candidates.append(d)
+  }
+  return candidates.filter { $0 > date }.min()
+}
+
 // MARK: - 数据获取
 
 enum DS {

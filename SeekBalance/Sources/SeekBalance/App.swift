@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UserNotifications
 
 // MARK: - 入口（支持 --once 命令行模式用于自检）
 
@@ -36,6 +37,15 @@ struct Main {
     }
     let p = currentPeriodInfo()
     print("当前时段: \(p.currentRange)（距离\(p.isPeakNow ? "高峰" : "空闲")结束\(fmtCountdown(p.secondsUntilNext))）")
+    if let np = nextPeakStart(after: Date()) {
+      var cal = Calendar(identifier: .gregorian)
+      cal.timeZone = Prices.beijing
+      let hh = cal.component(.hour, from: np)
+      let mm = cal.component(.minute, from: np)
+      let remind = UserDefaults.standard.bool(forKey: "peakReminderEnabled")
+      let mins = UserDefaults.standard.integer(forKey: "peakReminderMinutes")
+      print("下一高峰: \(String(format: "%02d:%02d", hh, mm))（提醒: \(remind ? "提前 \(mins) 分钟" : "关闭")）")
+    }
     let t = r.totals
     print("累计: 输入(未命中) \(fmtTokens(t.uncachedInput)) / 缓存命中 \(fmtTokens(t.cacheRead)) / 输出 \(fmtTokens(t.output))")
     if r.today.calls > 0 {
@@ -74,6 +84,11 @@ func fmtCountdown(_ seconds: TimeInterval) -> String {
   return "即将切换"
 }
 
+/// 请求系统通知权限（首次开启提醒时弹出系统授权框）
+func requestNotificationPermission() {
+  UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+}
+
 // MARK: - 模型
 
 @MainActor
@@ -91,6 +106,63 @@ final class BalanceModel: ObservableObject {
   @Published var keyMissing = false
   @Published var apiKeyInput = ""
   private var timer: Timer?
+  private var reminderTimer: Timer?
+
+  init() {
+    // 提醒定时器应用启动即运行，不依赖面板打开
+    startReminderTimer()
+  }
+
+  /// 高峰前提醒：每 30 秒检查一次，进入提醒窗口（空闲时段且距下一高峰 ≤ 设定分钟）就发通知
+  func startReminderTimer() {
+    if UserDefaults.standard.bool(forKey: "peakReminderEnabled") {
+      UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+    reminderTimer?.invalidate()
+    reminderTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+      Task { @MainActor [weak self] in self?.checkPeakReminder() }
+    }
+    checkPeakReminder()
+  }
+
+  func checkPeakReminder() {
+    let defaults = UserDefaults.standard
+    guard defaults.bool(forKey: "peakReminderEnabled") else { return }
+    // 只在空闲时段提醒（高峰中不打扰）
+    let period = currentPeriodInfo()
+    guard !period.isPeakNow else { return }
+    let minutes = defaults.integer(forKey: "peakReminderMinutes")
+    guard minutes >= 0, minutes <= 60 else { return }
+    guard let nextPeak = nextPeakStart(after: Date()) else { return }
+    let interval = nextPeak.timeIntervalSinceNow
+    guard interval > 0 else { return }
+    let window = minutes == 0 ? 30.0 : Double(minutes) * 60
+    guard interval <= window else { return }
+    // 同一波高峰只提醒一次
+    let lastNotified = defaults.double(forKey: "peakReminderLastNotified")
+    guard abs(nextPeak.timeIntervalSince1970 - lastNotified) > 60 else { return }
+    defaults.set(nextPeak.timeIntervalSince1970, forKey: "peakReminderLastNotified")
+    sendPeakReminder(minutesUntil: max(0, Int(interval / 60)), peakStart: nextPeak)
+  }
+
+  private func sendPeakReminder(minutesUntil: Int, peakStart: Date) {
+    var cal = Calendar(identifier: .gregorian)
+    cal.timeZone = Prices.beijing
+    let hour = cal.component(.hour, from: peakStart)
+    let range = hour == 9 ? "9:00–12:00" : "14:00–18:00"
+    let content = UNMutableNotificationContent()
+    content.title = "⏰ 高峰时段快到了"
+    content.body = minutesUntil > 0
+      ? "还有 \(minutesUntil) 分钟进入高峰（\(range)），价格将上调。要省钱的话现在抓紧！"
+      : "高峰时段（\(range)）即将开始，价格已上调。"
+    content.sound = .default
+    let request = UNNotificationRequest(
+      identifier: "peak-reminder-\(Int(peakStart.timeIntervalSince1970))",
+      content: content,
+      trigger: nil
+    )
+    UNUserNotificationCenter.current().add(request)
+  }
 
   var balanceText: String {
     if let b = balance { return String(format: "¥%.2f", b.total) }
@@ -161,6 +233,8 @@ struct SeekBalanceApp: App {
 struct BalancePanelView: View {
   @ObservedObject var model: BalanceModel
   @Binding var showBalanceText: Bool
+  @AppStorage("peakReminderEnabled") private var reminderEnabled = false
+  @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
 
   var body: some View {
     VStack(alignment: .leading, spacing: 3) {
@@ -205,6 +279,19 @@ struct BalancePanelView: View {
       let warnSoon = !period.isPeakNow && period.secondsUntilNext <= 30 * 60
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
       row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: warnSoon ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+
+      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
+      Toggle("高峰前提醒", isOn: $reminderEnabled)
+        .controlSize(.small)
+        .padding(.vertical, 1)
+        .onChange(of: reminderEnabled) { enabled in
+          if enabled { requestNotificationPermission() }
+        }
+      if reminderEnabled {
+        Stepper(reminderMinutes == 0 ? "高峰开始时提醒" : "提前 \(reminderMinutes) 分钟提醒", value: $reminderMinutes, in: 0...60)
+          .controlSize(.small)
+          .padding(.vertical, 1)
+      }
 
       Divider().padding(.vertical, 2)
 
@@ -269,6 +356,8 @@ struct BalancePanelView: View {
 
 struct BalanceMenuView: View {
   @ObservedObject var model: BalanceModel
+  @AppStorage("peakReminderEnabled") private var reminderEnabled = false
+  @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
 
   var body: some View {
     VStack(alignment: .leading, spacing: 1) {
@@ -308,6 +397,19 @@ struct BalanceMenuView: View {
       let warnSoon = !period.isPeakNow && period.secondsUntilNext <= 30 * 60
       row("当前时段", period.currentRange, valueColor: period.isPeakNow ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
       row("距离\(period.isPeakNow ? "高峰" : "空闲")结束", fmtCountdown(period.secondsUntilNext), valueColor: warnSoon ? Color(nsColor: .systemRed) : Color(nsColor: .systemGreen))
+
+      // 高峰前提醒设置：开启后按设定分钟数提前发系统通知
+      Toggle("高峰前提醒", isOn: $reminderEnabled)
+        .controlSize(.small)
+        .padding(.vertical, 1)
+        .onChange(of: reminderEnabled) { enabled in
+          if enabled { requestNotificationPermission() }
+        }
+      if reminderEnabled {
+        Stepper(reminderMinutes == 0 ? "高峰开始时提醒" : "提前 \(reminderMinutes) 分钟提醒", value: $reminderMinutes, in: 0...60)
+          .controlSize(.small)
+          .padding(.vertical, 1)
+      }
 
       Divider().padding(.vertical, 2)
 
