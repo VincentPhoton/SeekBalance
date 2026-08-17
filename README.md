@@ -23,6 +23,17 @@
 | :---: | :---: |
 | ![浅色模式](screenshots/light-mode.png) | ![暗色模式](screenshots/dark-mode.png) |
 
+## 功能细节
+
+- **首次使用**：面板内直接粘贴 DeepSeek API 密钥，自动存入 Mac 钥匙串（无需配置文件）
+- **花费精确计价**：按每次请求的实际时间计价——8/17 前按老价；之后高峰时段（北京时间 9:00–12:00、14:00–18:00）按高峰价，其余按空闲价
+- **高峰/空闲用量分开统计**：今日用量分别显示高峰时段与空闲时段的 token 用量
+- **时段状态提示**：面板显示当前是高峰还是空闲时段（含时间段），并倒计时距**当前时段结束**还有多久
+- **高峰前提醒**：可设置提前 0–60 分钟发系统通知，提醒"高峰快到了、价格将上调"（仅空闲时段提醒，同一波高峰只提醒一次）
+- 菜单栏余额文字可开关（面板内"状态栏显示余额"）
+- 自动刷新间隔可选（3 / 5 / 10 分钟，默认 5）
+- 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
+
 ## 安装
 
 ### 方式一：DMG 安装包（推荐，Apple 芯片专用）
@@ -66,17 +77,6 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 - 本工具**不联网上传任何统计数据**，所有用量数据都来自你本地的 dsh 文件
 - DeepSeek **未提供公开的用量查询接口**（实测 `/user/usage` 等均返回 404），因此用量统计只能读取本机记录；全账户用量需网页后台私有接口，未采用
 
-## 功能细节
-
-- **首次使用**：面板内直接粘贴 DeepSeek API 密钥，自动存入 Mac 钥匙串（无需配置文件）
-- **花费精确计价**：按每次请求的实际时间计价——8/17 前按老价；之后高峰时段（北京时间 9:00–12:00、14:00–18:00）按高峰价，其余按空闲价
-- **高峰/空闲用量分开统计**：今日用量分别显示高峰时段与空闲时段的 token 用量
-- **时段状态提示**：面板显示当前是高峰还是空闲时段（含时间段），并倒计时距**当前时段结束**还有多久
-- **高峰前提醒**：可设置提前 0–60 分钟发系统通知，提醒"高峰快到了、价格将上调"（仅空闲时段提醒，同一波高峰只提醒一次）
-- 菜单栏余额文字可开关（面板内"状态栏显示余额"）
-- 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
-- 自动刷新间隔可选（3 / 5 / 10 分钟，默认 5）；改动数据层后建议先跑自检
-
 ## 卸载
 
 - 用安装包内附的"卸载SeekBalance"一键卸载，或手动删除 `/Applications/SeekBalance.app`
@@ -86,7 +86,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## 开发者
 
 - 编译：`swift build -c release`
-- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.0.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
+- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.2-arm64.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
 
 ## License
 
