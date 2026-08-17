@@ -205,7 +205,7 @@ final class BalanceModel: ObservableObject {
   // MARK: - 版本与自动更新
 
   var currentVersion: String {
-    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1.1"
+    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1.2"
   }
 
   /// 检查更新：查 GitHub 最新 Release，有新版则自动下载安装并重启
@@ -374,9 +374,28 @@ final class BalanceModel: ObservableObject {
 
   func start() {
     refresh()
-    timer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+    scheduleRefreshTimer()
+  }
+
+  /// 按设置的刷新频率（3/5/10 分钟）重排定时器
+  private func scheduleRefreshTimer() {
+    timer?.invalidate()
+    let minutes = refreshMinutesSetting()
+    timer = Timer.scheduledTimer(withTimeInterval: TimeInterval(minutes) * 60, repeats: true) { [weak self] _ in
       Task { @MainActor [weak self] in self?.refresh() }
     }
+  }
+
+  /// 用户修改刷新频率：持久化并立即生效
+  func setRefreshInterval(minutes: Int) {
+    UserDefaults.standard.set(minutes, forKey: "refreshIntervalMinutes")
+    scheduleRefreshTimer()
+    refresh()
+  }
+
+  private func refreshMinutesSetting() -> Int {
+    let m = UserDefaults.standard.integer(forKey: "refreshIntervalMinutes")
+    return [3, 5, 10].contains(m) ? m : 5
   }
 
   func refresh() {
@@ -438,6 +457,7 @@ struct BalancePanelView: View {
   @Binding var showBalanceText: Bool
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
+  @AppStorage("refreshIntervalMinutes") private var refreshMinutes = 5
   @State private var minutesText = "15"
   @FocusState private var minutesFocused: Bool
 
@@ -562,6 +582,23 @@ struct BalancePanelView: View {
         .onAppear { minutesText = "\(reminderMinutes)" }
       }
 
+      // 刷新频率设置（3/5/10 分钟，修改即时生效）
+      HStack(spacing: 6) {
+        Text("刷新频率").font(.system(size: 10))
+        Picker("", selection: $refreshMinutes) {
+          Text("3 分钟").tag(3)
+          Text("5 分钟").tag(5)
+          Text("10 分钟").tag(10)
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .labelsHidden()
+        .onChange(of: refreshMinutes) { newValue in
+          model.setRefreshInterval(minutes: newValue)
+        }
+      }
+      .padding(.vertical, 1)
+
       HStack(spacing: 8) {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }
         Button("退出") { NSApp.terminate(nil) }
@@ -617,6 +654,7 @@ struct BalanceMenuView: View {
   @ObservedObject var model: BalanceModel
   @AppStorage("peakReminderEnabled") private var reminderEnabled = false
   @AppStorage("peakReminderMinutes") private var reminderMinutes = 15
+  @AppStorage("refreshIntervalMinutes") private var refreshMinutes = 5
   @State private var minutesText = "15"
   @FocusState private var minutesFocused: Bool
 
@@ -729,6 +767,23 @@ struct BalanceMenuView: View {
         .padding(.vertical, 1)
         .onAppear { minutesText = "\(reminderMinutes)" }
       }
+
+      // 刷新频率设置（3/5/10 分钟，修改即时生效）
+      HStack(spacing: 6) {
+        Text("刷新频率").font(.system(size: 10))
+        Picker("", selection: $refreshMinutes) {
+          Text("3 分钟").tag(3)
+          Text("5 分钟").tag(5)
+          Text("10 分钟").tag(10)
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .labelsHidden()
+        .onChange(of: refreshMinutes) { newValue in
+          model.setRefreshInterval(minutes: newValue)
+        }
+      }
+      .padding(.vertical, 1)
 
       HStack(spacing: 8) {
         Button("🔄 刷新") { minutesFocused = false; model.refresh() }

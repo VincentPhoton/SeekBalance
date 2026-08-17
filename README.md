@@ -12,7 +12,7 @@
 
 - 菜单栏常驻显示余额（如 `¥7.85`），不占 Dock，不弹窗打扰
 - 点击图标弹出面板：余额 / 充值 / 赠送、今日请求次数与 token、累计用量与花费
-- 每 10 分钟自动刷新；打开面板立即刷新
+- 自动刷新频率可选（3 / 5 / 10 分钟，默认 5）；打开面板立即刷新
 - 深色/浅色模式自动适配，实心背景高对比度，小屏幕也一屏放下
 
 ## 截图
@@ -29,7 +29,7 @@
 
 > ⚠️ 仅支持 **Apple 芯片**（M1 / M2 / M3 / M4，arm64）。Intel Mac 暂不支持。
 
-1. 直接下载：[**SeekBalance-1.1.1-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.1-arm64.dmg)（或到 [Releases](../../releases) 页面下载）
+1. 直接下载：[**SeekBalance-1.1.2-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.2-arm64.dmg)（或到 [Releases](../../releases) 页面下载）
 2. 打开 DMG，把 `SeekBalance.app` 拖进"应用程序"
 3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
 4. DMG 里附带了"卸载SeekBalance"一键卸载程序（自动清理偏好与缓存）
@@ -75,7 +75,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 - **高峰前提醒**：可设置提前 0–60 分钟发系统通知，提醒"高峰快到了、价格将上调"（仅空闲时段提醒，同一波高峰只提醒一次）
 - 菜单栏余额文字可开关（面板内"状态栏显示余额"）
 - 自检模式：`./.build/release/SeekBalance --once` 打印报告后退出
-- 自动刷新间隔 10 分钟；改动数据层后建议先跑自检
+- 自动刷新间隔可选（3 / 5 / 10 分钟，默认 5）；改动数据层后建议先跑自检
 
 ## 卸载
 
