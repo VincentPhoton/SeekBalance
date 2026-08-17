@@ -205,7 +205,7 @@ final class BalanceModel: ObservableObject {
   // MARK: - 版本与自动更新
 
   var currentVersion: String {
-    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1"
+    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.1.1"
   }
 
   /// 检查更新：查 GitHub 最新 Release，有新版则自动下载安装并重启
@@ -571,6 +571,9 @@ struct BalancePanelView: View {
           .font(.system(size: 9))
         Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
+          // 蓝色 + 下划线：提示可点击（容器 foregroundColor 会覆盖默认链接色，需显式指定）
+          .foregroundColor(Color(nsColor: .linkColor))
+          .underline()
       }
       .controlSize(.small)
       .padding(.top, 1)
@@ -736,6 +739,9 @@ struct BalanceMenuView: View {
           .font(.system(size: 9))
         Link("v\(model.currentVersion)", destination: URL(string: "https://github.com/VincentPhoton/SeekBalance")!)
           .font(.system(size: 9))
+          // 蓝色 + 下划线：提示可点击（容器 foregroundColor 会覆盖默认链接色，需显式指定）
+          .foregroundColor(Color(nsColor: .linkColor))
+          .underline()
       }
       .controlSize(.small)
       .padding(.top, 2)
