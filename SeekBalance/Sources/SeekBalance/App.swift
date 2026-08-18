@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UserNotifications
+import Combine
 
 // MARK: - 入口（支持 --once 命令行模式用于自检）
 
@@ -430,25 +431,158 @@ final class BalanceModel: ObservableObject {
 
 // MARK: - 应用（窗口式弹层：实心背景 + 显式标签色，彻底脱离磨砂玻璃；紧凑布局）
 
+// MARK: - 应用（AppKit 状态栏：左键弹面板、右键快捷菜单）
+
 struct SeekBalanceApp: App {
-  @StateObject private var model = BalanceModel()
-  // 开关记忆：状态栏是否显示余额数字（UserDefaults 持久化）
-  @AppStorage("showBalanceText") private var showBalanceText = true
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
   var body: some Scene {
-    MenuBarExtra {
-      BalancePanelView(model: model, showBalanceText: $showBalanceText)
-        .frame(width: 260)
-    } label: {
-      HStack(spacing: 4) {
-        Image(systemName: "creditcard")
-        if showBalanceText {
-          Text(model.balanceText)
-            .font(.system(size: 12, weight: .medium))
-        }
-      }
+    // 菜单栏应用无主窗口；Settings 场景仅用于让 App 生命周期正常运转
+    Settings { EmptyView() }
+  }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+  private var statusItem: NSStatusItem?
+  private var popover: NSPopover?
+  private var contextMenu: NSMenu?
+  private var cancellables = Set<AnyCancellable>()
+  private lazy var model = BalanceModel()
+
+  /// 状态栏是否显示余额数字（UserDefaults 持久化，与面板开关共用 "showBalanceText"）
+  private var showBalanceText: Bool {
+    get { UserDefaults.standard.object(forKey: "showBalanceText") as? Bool ?? true }
+    set {
+      UserDefaults.standard.set(newValue, forKey: "showBalanceText")
+      updateStatusLabel()
     }
-    .menuBarExtraStyle(.window)
+  }
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    model.start()
+    // 余额变化时刷新菜单栏文字
+    model.objectWillChange
+      .sink { [weak self] _ in self?.updateStatusLabel() }
+      .store(in: &cancellables)
+    setupStatusItem()
+    setupPopover()
+    updateStatusLabel()
+  }
+
+  // MARK: 状态栏
+
+  private func setupStatusItem() {
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    statusItem = item
+    if let button = item.button {
+      button.image = NSImage(systemSymbolName: "creditcard", accessibilityDescription: "SeekBalance")
+      button.imagePosition = .imageLeading
+      button.target = self
+      button.action = #selector(statusItemClicked(_:))
+      // 左键与右键都触发，在 action 里区分
+      button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+    buildContextMenu()
+  }
+
+  @objc private func statusItemClicked(_ sender: Any?) {
+    guard let event = NSApp.currentEvent else { return }
+    if event.type == .rightMouseUp {
+      // 右键：弹出快捷菜单
+      if let button = statusItem?.button, let menu = contextMenu {
+        statusItem?.menu = menu
+        button.performClick(nil)
+        statusItem?.menu = nil
+      }
+    } else {
+      togglePopover()
+    }
+  }
+
+  /// 右键快捷菜单：刷新 / 检查更新 / 关于 / GitHub / 退出
+  private func buildContextMenu() {
+    let menu = NSMenu()
+    menu.addItem(makeItem("刷新", #selector(refresh)))
+    menu.addItem(makeItem("检查更新", #selector(checkForUpdate)))
+    menu.addItem(NSMenuItem.separator())
+    menu.addItem(makeItem("关于", #selector(showAbout)))
+    menu.addItem(makeItem("GitHub 上的 SeekBalance", #selector(openGitHub)))
+    menu.addItem(NSMenuItem.separator())
+    menu.addItem(makeItem("退出 SeekBalance", #selector(quitApp)))
+    contextMenu = menu
+  }
+
+  private func makeItem(_ title: String, _ action: Selector) -> NSMenuItem {
+    let i = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    i.target = self
+    return i
+  }
+
+  // MARK: 面板弹层
+
+  private func setupPopover() {
+    let p = NSPopover()
+    p.behavior = .transient
+    p.contentSize = NSSize(width: 260, height: 560)
+    let panel = BalancePanelView(
+      model: model,
+      showBalanceText: Binding(
+        get: { self.showBalanceText },
+        set: { self.showBalanceText = $0 }
+      )
+    )
+    p.contentViewController = NSHostingController(rootView: panel)
+    popover = p
+  }
+
+  private func togglePopover() {
+    guard let button = statusItem?.button else { return }
+    if let popover, popover.isShown {
+      popover.performClose(nil)
+    } else if let popover {
+      popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+      // 让弹层获得键盘焦点（输入框/粘贴密钥可用）
+      popover.contentViewController?.view.window?.makeKey()
+    }
+  }
+
+  private func updateStatusLabel() {
+    guard let button = statusItem?.button else { return }
+    button.title = showBalanceText ? model.balanceText : ""
+  }
+
+  // MARK: 快捷菜单动作
+
+  @objc private func refresh() {
+    model.refresh()
+  }
+
+  @objc private func checkForUpdate() {
+    model.checkForUpdate()
+  }
+
+  @objc private func quitApp() {
+    NSApp.terminate(nil)
+  }
+
+  @objc private func openGitHub() {
+    if let url = URL(string: "https://github.com/VincentPhoton/SeekBalance") {
+      NSWorkspace.shared.open(url)
+    }
+  }
+
+  /// 关于：屏幕中央弹窗（名字、版本、用途、作者）
+  @objc private func showAbout() {
+    let alert = NSAlert()
+    alert.messageText = "关于 SeekBalance"
+    alert.informativeText =
+      "SeekBalance v\(model.currentVersion)\n\n"
+      + "macOS 菜单栏小工具：一眼查看 DeepSeek API 的余额、今日用量与花费估算。\n\n"
+      + "作者：VincentPhoton"
+    alert.addButton(withTitle: "好的")
+    alert.alertStyle = .informational
+    alert.runModal()
   }
 }
 

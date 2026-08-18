@@ -34,6 +34,7 @@ Click the icon to open the panel — automatically adapts to light / dark mode (
 - **Peak reminders**: schedule a system notification 0–60 minutes before the peak starts ("peak is coming, prices will go up") — only during off-peak periods, once per peak window
 - Menu bar balance text can be toggled on/off ("Show balance in menu bar" in the panel)
 - Auto-refresh interval selectable (3 / 5 / 10 minutes, default 5)
+- **Right-click menu on the menu bar icon**: Refresh / Check for updates / About (name, version, what it does, author) / GitHub page / Quit
 - Self-check mode: `./.build/release/SeekBalance --once` prints a report and exits
 
 ## Installation
@@ -42,7 +43,7 @@ Click the icon to open the panel — automatically adapts to light / dark mode (
 
 > ⚠️ Requires **Apple Silicon** (M1 / M2 / M3 / M4, arm64). Intel Macs are not supported.
 
-1. Download directly: [**SeekBalance-1.1.2-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.2-arm64.dmg) (or from the [Releases](../../releases) page)
+1. Download directly: [**SeekBalance-1.1.3-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.3-arm64.dmg) (or from the [Releases](../../releases) page)
 2. Open the DMG and drag `SeekBalance.app` into "Applications"
 3. If macOS says "cannot verify the developer" on first launch: right-click → Open → Open again
 4. The DMG includes the "UninstallSeekBalance" one-click uninstaller (cleans preferences & caches)
@@ -88,7 +89,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## For developers
 
 - Build: `swift build -c release`
-- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.2-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
+- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.3-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
 
 ## License
 
