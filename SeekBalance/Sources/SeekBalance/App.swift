@@ -566,7 +566,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func setupPopover() {
     let p = NSPopover()
     p.behavior = .transient
-    p.contentSize = NSSize(width: 260, height: 560)
     let panel = BalancePanelView(
       model: model,
       showBalanceText: Binding(
@@ -574,7 +573,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         set: { self.showBalanceText = $0 }
       )
     )
-    p.contentViewController = NSHostingController(rootView: panel)
+    let hosting = NSHostingController(rootView: panel)
+    // 禁用宿主自动尺寸报告，弹层尺寸完全由 contentSize 决定
+    hosting.sizingOptions = []
+    p.contentViewController = hosting
+    // 用 SwiftUI 内容的实际期望高度决定弹层高度（260 宽，高度按内容自适应、限制在 560 以内）
+    let fitting = hosting.view.fittingSize
+    let height = min(max(fitting.height, 240), 560)
+    p.contentSize = NSSize(width: 260, height: height)
     popover = p
   }
 
