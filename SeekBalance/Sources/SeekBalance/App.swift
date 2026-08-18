@@ -104,24 +104,53 @@ enum UpdateStatus: Equatable {
   case failed(String)
 }
 
-/// 屏幕中央"关于"弹窗：用系统标准 About 面板（尺寸系统管理，绝不会超高）
+// MARK: - 弹窗协调（"关于"面板 与 "检查更新"结果 只保留后点击的那个，避免窗口重复）
+
 @MainActor
-func showAboutPanel() {
-  NSApp.activate(ignoringOtherApps: true)
-  let credits = NSAttributedString(
-    string: "macOS 菜单栏小工具：查看 DeepSeek API 余额、今日用量与花费估算。\n\n@VincentPhoton",
-    attributes: [
-      .foregroundColor: NSColor.labelColor,
-      .font: NSFont.systemFont(ofSize: 11)
-    ]
-  )
-  let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.4"
-  NSApp.orderFrontStandardAboutPanel(options: [
-    .applicationName: "SeekBalance",
-    .applicationVersion: version,
-    .credits: credits,
-    NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "VincentPhoton",
-  ])
+final class DialogGate {
+  static let shared = DialogGate()
+  private weak var aboutWindow: NSWindow?
+  private var aboutShownAt: Date?
+  private var checkStartedAt: Date?
+
+  /// 打开系统"关于"面板：先关掉旧面板（避免重复），并记录时间
+  func presentAbout() {
+    closeAbout()
+    let before = Set(NSApp.windows)
+    NSApp.activate(ignoringOtherApps: true)
+    let credits = NSAttributedString(
+      string: "macOS 菜单栏小工具：查看 DeepSeek API 余额、今日用量与花费估算。\n\n@VincentPhoton",
+      attributes: [
+        .foregroundColor: NSColor.labelColor,
+        .font: NSFont.systemFont(ofSize: 11)
+      ]
+    )
+    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.4"
+    NSApp.orderFrontStandardAboutPanel(options: [
+      .applicationName: "SeekBalance",
+      .applicationVersion: version,
+      .credits: credits,
+    ])
+    aboutWindow = NSApp.windows.first { !before.contains($0) }
+    aboutShownAt = Date()
+  }
+
+  /// 关闭"关于"面板（在弹更新结果前调用）
+  func closeAbout() {
+    aboutWindow?.close()
+    aboutWindow = nil
+  }
+
+  /// 检查更新开始时记录时间
+  func markCheckStarted() {
+    checkStartedAt = Date()
+  }
+
+  /// 更新检查完成时是否弹结果：若期间用户打开了"关于"（后点击的是关于），则不弹
+  func shouldShowUpdateResult() -> Bool {
+    guard let about = aboutShownAt, let started = checkStartedAt else { return true }
+    return about <= started
+  }
 }
 
 /// 屏幕中央结果弹窗：用系统标准 NSAlert（尺寸系统管理，绝不会超高）
@@ -246,14 +275,16 @@ final class BalanceModel: ObservableObject {
     if case .installing = updateStatus { return }
     if case .checking = updateStatus { return }
     updateStatus = .checking
+    DialogGate.shared.markCheckStarted()
     Task {
       do {
         let info = try await fetchLatestRelease()
         let latest = info.tag.replacingOccurrences(of: "v", with: "")
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckTime")
         guard versionCompare(latest, currentVersion) > 0 else {
-          // 已是最新：屏幕中央弹窗提示（含上次检查更新时间）
+          // 已是最新：系统弹窗提示（含上次检查更新时间）；若期间用户点了"关于"，则不弹
           updateStatus = .idle
+          guard DialogGate.shared.shouldShowUpdateResult() else { return }
           showUpdateDialog(
             title: "已是最新版本",
             message: "当前版本：v\(currentVersion)\n上次检查更新：\(lastCheckTimeText())"
@@ -265,13 +296,15 @@ final class BalanceModel: ObservableObject {
       } catch {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckTime")
         updateStatus = .idle
+        guard DialogGate.shared.shouldShowUpdateResult() else { return }
         showUpdateDialog(title: "检查更新失败", message: error.localizedDescription)
       }
     }
   }
 
-  /// 检查更新结果弹窗（系统标准 NSAlert，尺寸系统管理）
+  /// 检查更新结果弹窗（系统标准 NSAlert；弹前先关掉"关于"面板，避免窗口重复）
   private func showUpdateDialog(title: String, message: String) {
+    DialogGate.shared.closeAbout()
     showCenteredDialog(title: title, message: message)
   }
 
@@ -607,7 +640,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   /// 关于：系统标准 About 面板（图标、名称、版本、用途、作者）
   @objc private func showAbout() {
-    showAboutPanel()
+    DialogGate.shared.presentAbout()
   }
 }
 
