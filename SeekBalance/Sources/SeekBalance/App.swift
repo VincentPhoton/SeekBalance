@@ -104,57 +104,35 @@ enum UpdateStatus: Equatable {
   case failed(String)
 }
 
+/// 屏幕中央"关于"弹窗：用系统标准 About 面板（尺寸系统管理，绝不会超高）
 @MainActor
-private final class ModalCloser: NSObject, NSWindowDelegate {
-  func windowWillClose(_ notification: Notification) {
-    NSApp.stopModal()
-  }
+func showAboutPanel() {
+  NSApp.activate(ignoringOtherApps: true)
+  let credits = NSAttributedString(
+    string: "macOS 菜单栏小工具：查看 DeepSeek API 余额、今日用量与花费估算。\n\n@VincentPhoton",
+    attributes: [
+      .foregroundColor: NSColor.labelColor,
+      .font: NSFont.systemFont(ofSize: 11)
+    ]
+  )
+  let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1.4"
+  NSApp.orderFrontStandardAboutPanel(options: [
+    .applicationName: "SeekBalance",
+    .applicationVersion: version,
+    .credits: credits,
+    NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "VincentPhoton",
+  ])
 }
 
-/// 屏幕中央自定义弹窗：图标 + 标题 + 多行内容，全部居中（模态，点"好的"或关闭按钮退出）
-/// 注意：固定窗口尺寸，用 contentView 挂 SwiftUI（绝不设 contentViewController，避免窗口被自动拉大）
+/// 屏幕中央结果弹窗：用系统标准 NSAlert（尺寸系统管理，绝不会超高）
 @MainActor
-func showCenteredDialog(title: String, lines: [String], buttonTitle: String = "好的") {
-  let closer = ModalCloser()
-  let panel = NSPanel(
-    contentRect: NSRect(x: 0, y: 0, width: 360, height: 340),
-    styleMask: [.titled, .closable],
-    backing: .buffered,
-    defer: false
-  )
-  panel.title = ""
-  panel.isReleasedWhenClosed = false
-  panel.delegate = closer
-  let icon = NSImage(named: "AppIcon") ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundleURL.path)
-  let root = VStack(spacing: 10) {
-    Spacer(minLength: 0)
-    Image(nsImage: icon)
-      .resizable()
-      .frame(width: 64, height: 64)
-    Text(title)
-      .font(.system(size: 14, weight: .semibold))
-    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-      Text(line)
-        .font(.system(size: 12))
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    Button(buttonTitle) {
-      panel.close()
-      NSApp.stopModal()
-    }
-    .keyboardShortcut(.defaultAction)
-    .padding(.top, 6)
-    Spacer(minLength: 0)
-  }
-  .frame(maxWidth: .infinity, maxHeight: .infinity)
-  .padding(24)
-  let hosting = NSHostingController(rootView: root)
-  panel.contentView = hosting.view
-  hosting.view.frame = panel.contentView!.bounds
-  hosting.view.autoresizingMask = [.width, .height]
-  panel.center()
-  NSApp.runModal(for: panel)
+func showCenteredDialog(title: String, message: String) {
+  let alert = NSAlert()
+  alert.messageText = title
+  alert.informativeText = message
+  alert.addButton(withTitle: "好的")
+  alert.alertStyle = .informational
+  alert.runModal()
 }
 
 func updateStatusText(_ s: UpdateStatus) -> String {
@@ -292,9 +270,9 @@ final class BalanceModel: ObservableObject {
     }
   }
 
-  /// 检查更新结果弹窗（屏幕中央，图标+内容居中）
+  /// 检查更新结果弹窗（系统标准 NSAlert，尺寸系统管理）
   private func showUpdateDialog(title: String, message: String) {
-    showCenteredDialog(title: title, lines: message.split(separator: "\n").map(String.init))
+    showCenteredDialog(title: title, message: message)
   }
 
   /// 上次检查更新的时间
@@ -627,16 +605,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// 关于：屏幕中央弹窗（图标、名字、版本、用途、作者，全部居中）
+  /// 关于：系统标准 About 面板（图标、名称、版本、用途、作者）
   @objc private func showAbout() {
-    showCenteredDialog(
-      title: "关于 SeekBalance",
-      lines: [
-        "v\(model.currentVersion)",
-        "macOS 菜单栏小工具：查看 DeepSeek API 余额、用量与花费估算。",
-        "@VincentPhoton",
-      ]
-    )
+    showAboutPanel()
   }
 }
 
