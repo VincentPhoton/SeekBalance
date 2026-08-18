@@ -597,14 +597,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     .frame(width: 260)
     .background(Color(nsColor: .windowBackgroundColor))
     let hosting = NSHostingController(rootView: panel)
-    // 弹层高度按 SwiftUI 内容自适应（避免底部大片空白，同时限制上限防止超高）
+    // 禁用自动尺寸报告；弹层尺寸在每次打开时按内容重新测量（见 togglePopover）
     hosting.sizingOptions = []
-    let fitting = hosting.view.fittingSize
-    let height = min(max(fitting.height, 300), 560)
-    let fixed = NSSize(width: 260, height: height)
-    hosting.preferredContentSize = fixed
     p.contentViewController = hosting
-    p.contentSize = fixed
+    p.contentSize = NSSize(width: 260, height: 500)
     popover = p
   }
 
@@ -613,6 +609,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if let popover, popover.isShown {
       popover.performClose(nil)
     } else if let popover {
+      // 打开前按当前内容高度自适应：数据加载后内容可能更高（余额/今日用量等），
+      // 在这里重新测量，避免内容被裁切、也避免底部留大片空白
+      if let host = popover.contentViewController as? NSHostingController<BalancePanelView> {
+        let h = min(max(host.view.fittingSize.height, 300), 560)
+        popover.contentSize = NSSize(width: 260, height: h)
+      }
       popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
       // 让弹层获得键盘焦点（输入框/粘贴密钥可用）
       popover.contentViewController?.view.window?.makeKey()
