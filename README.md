@@ -43,7 +43,7 @@
 
 > ⚠️ 仅支持 **Apple 芯片**（M1 / M2 / M3 / M4，arm64）。Intel Mac 暂不支持。
 
-1. 直接下载：[**SeekBalance-1.1.3-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.3-arm64.dmg)（或到 [Releases](../../releases) 页面下载）
+1. 直接下载：[**SeekBalance-1.1.4-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.4-arm64.dmg)（或到 [Releases](../../releases) 页面下载）
 2. 打开 DMG，把 `SeekBalance.app` 拖进"应用程序"
 3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
 4. DMG 里附带了"卸载SeekBalance"一键卸载程序（自动清理偏好与缓存）
@@ -89,7 +89,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## 开发者
 
 - 编译：`swift build -c release`
-- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.3-arm64.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
+- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.4-arm64.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
 
 ## License
 

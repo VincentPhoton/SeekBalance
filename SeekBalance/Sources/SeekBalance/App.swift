@@ -104,6 +104,53 @@ enum UpdateStatus: Equatable {
   case failed(String)
 }
 
+@MainActor
+private final class ModalCloser: NSObject, NSWindowDelegate {
+  func windowWillClose(_ notification: Notification) {
+    NSApp.stopModal()
+  }
+}
+
+/// 屏幕中央自定义弹窗：图标 + 标题 + 多行内容，全部居中（模态，点"好的"或关闭按钮退出）
+@MainActor
+func showCenteredDialog(title: String, lines: [String], buttonTitle: String = "好的") {
+  let panel = NSPanel(
+    contentRect: NSRect(x: 0, y: 0, width: 360, height: 280),
+    styleMask: [.titled, .closable],
+    backing: .buffered,
+    defer: false
+  )
+  panel.title = ""
+  panel.isReleasedWhenClosed = false
+  let closer = ModalCloser()
+  panel.delegate = closer
+  let icon = NSImage(named: "AppIcon") ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundleURL.path)
+  let root = VStack(spacing: 10) {
+    Image(nsImage: icon)
+      .resizable()
+      .frame(width: 64, height: 64)
+    Text(title)
+      .font(.system(size: 14, weight: .semibold))
+    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+      Text(line)
+        .font(.system(size: 12))
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    Button(buttonTitle) {
+      panel.close()
+      NSApp.stopModal()
+    }
+    .keyboardShortcut(.defaultAction)
+    .padding(.top, 6)
+  }
+  .frame(maxWidth: .infinity)
+  .padding(24)
+  panel.contentViewController = NSHostingController(rootView: root)
+  panel.center()
+  NSApp.runModal(for: panel)
+}
+
 func updateStatusText(_ s: UpdateStatus) -> String {
   switch s {
   case .idle: return ""
@@ -239,14 +286,9 @@ final class BalanceModel: ObservableObject {
     }
   }
 
-  /// 屏幕中央弹窗（NSAlert，模态）
+  /// 检查更新结果弹窗（屏幕中央，图标+内容居中）
   private func showUpdateDialog(title: String, message: String) {
-    let alert = NSAlert()
-    alert.messageText = title
-    alert.informativeText = message
-    alert.addButton(withTitle: "好的")
-    alert.alertStyle = .informational
-    alert.runModal()
+    showCenteredDialog(title: title, lines: message.split(separator: "\n").map(String.init))
   }
 
   /// 上次检查更新的时间
@@ -300,8 +342,8 @@ final class BalanceModel: ObservableObject {
 
     updateStatus = .installing
     let mountPoint = try await mountDMG(tmp)
-    try await shell("rm -rf \(shq("/Applications/SeekBalance.app")) && cp -R \(shq(mountPoint + "/SeekBalance.app")) /Applications/SeekBalance.app")
-    try await shell("hdiutil detach \(shq(mountPoint)) -force")
+    _ = try await shell("rm -rf \(shq("/Applications/SeekBalance.app")) && cp -R \(shq(mountPoint + "/SeekBalance.app")) /Applications/SeekBalance.app")
+    _ = try await shell("hdiutil detach \(shq(mountPoint)) -force")
     try? FileManager.default.removeItem(at: tmp)
 
     // 标记刚更新：新版启动时弹"更新已完成"通知
@@ -572,17 +614,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// 关于：屏幕中央弹窗（名字、版本、用途、作者）
+  /// 关于：屏幕中央弹窗（图标、名字、版本、用途、作者，全部居中）
   @objc private func showAbout() {
-    let alert = NSAlert()
-    alert.messageText = "关于 SeekBalance"
-    alert.informativeText =
-      "SeekBalance v\(model.currentVersion)\n\n"
-      + "macOS 菜单栏小工具：一眼查看 DeepSeek API 的余额、今日用量与花费估算。\n\n"
-      + "作者：VincentPhoton"
-    alert.addButton(withTitle: "好的")
-    alert.alertStyle = .informational
-    alert.runModal()
+    showCenteredDialog(
+      title: "关于 SeekBalance",
+      lines: [
+        "v\(model.currentVersion)",
+        "macOS 菜单栏小工具：查看 DeepSeek API 余额、用量与花费估算。",
+        "@VincentPhoton",
+      ]
+    )
   }
 }
 

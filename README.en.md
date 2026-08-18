@@ -43,7 +43,7 @@ Click the icon to open the panel — automatically adapts to light / dark mode (
 
 > ⚠️ Requires **Apple Silicon** (M1 / M2 / M3 / M4, arm64). Intel Macs are not supported.
 
-1. Download directly: [**SeekBalance-1.1.3-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.3-arm64.dmg) (or from the [Releases](../../releases) page)
+1. Download directly: [**SeekBalance-1.1.4-arm64.dmg**](https://github.com/VincentPhoton/SeekBalance/releases/latest/download/SeekBalance-1.1.4-arm64.dmg) (or from the [Releases](../../releases) page)
 2. Open the DMG and drag `SeekBalance.app` into "Applications"
 3. If macOS says "cannot verify the developer" on first launch: right-click → Open → Open again
 4. The DMG includes the "UninstallSeekBalance" one-click uninstaller (cleans preferences & caches)
@@ -89,7 +89,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## For developers
 
 - Build: `swift build -c release`
-- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.3-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
+- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.4-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
 
 ## License
 
