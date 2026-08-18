@@ -516,7 +516,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     setupStatusItem()
     setupPopover()
     updateStatusLabel()
-    }
   }
 
   // MARK: 状态栏
