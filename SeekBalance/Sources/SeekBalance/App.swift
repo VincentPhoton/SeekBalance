@@ -159,6 +159,10 @@ func showCenteredDialog(title: String, message: String) {
   let alert = NSAlert()
   alert.messageText = title
   alert.informativeText = message
+  // 显式从应用包加载图标（避免 macOS 图标缓存显示旧图标）
+  if let icon = NSImage(named: "AppIcon") {
+    alert.icon = icon
+  }
   alert.addButton(withTitle: "好的")
   alert.alertStyle = .informational
   alert.runModal()
@@ -590,12 +594,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         set: { self.showBalanceText = $0 }
       )
     )
-    .frame(width: 260, height: 500, alignment: .top)
+    .frame(width: 260)
     .background(Color(nsColor: .windowBackgroundColor))
     let hosting = NSHostingController(rootView: panel)
-    // 显式固定尺寸：禁用自动尺寸报告，并把 preferredContentSize 与 contentSize 都设为同一值
+    // 弹层高度按 SwiftUI 内容自适应（避免底部大片空白，同时限制上限防止超高）
     hosting.sizingOptions = []
-    let fixed = NSSize(width: 260, height: 500)
+    let fitting = hosting.view.fittingSize
+    let height = min(max(fitting.height, 300), 560)
+    let fixed = NSSize(width: 260, height: height)
     hosting.preferredContentSize = fixed
     p.contentViewController = hosting
     p.contentSize = fixed
