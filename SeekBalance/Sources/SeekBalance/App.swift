@@ -112,20 +112,22 @@ private final class ModalCloser: NSObject, NSWindowDelegate {
 }
 
 /// 屏幕中央自定义弹窗：图标 + 标题 + 多行内容，全部居中（模态，点"好的"或关闭按钮退出）
+/// 注意：固定窗口尺寸，用 contentView 挂 SwiftUI（绝不设 contentViewController，避免窗口被自动拉大）
 @MainActor
 func showCenteredDialog(title: String, lines: [String], buttonTitle: String = "好的") {
+  let closer = ModalCloser()
   let panel = NSPanel(
-    contentRect: NSRect(x: 0, y: 0, width: 360, height: 280),
+    contentRect: NSRect(x: 0, y: 0, width: 360, height: 340),
     styleMask: [.titled, .closable],
     backing: .buffered,
     defer: false
   )
   panel.title = ""
   panel.isReleasedWhenClosed = false
-  let closer = ModalCloser()
   panel.delegate = closer
   let icon = NSImage(named: "AppIcon") ?? NSWorkspace.shared.icon(forFile: Bundle.main.bundleURL.path)
   let root = VStack(spacing: 10) {
+    Spacer(minLength: 0)
     Image(nsImage: icon)
       .resizable()
       .frame(width: 64, height: 64)
@@ -143,10 +145,14 @@ func showCenteredDialog(title: String, lines: [String], buttonTitle: String = "�
     }
     .keyboardShortcut(.defaultAction)
     .padding(.top, 6)
+    Spacer(minLength: 0)
   }
-  .frame(maxWidth: .infinity)
+  .frame(maxWidth: .infinity, maxHeight: .infinity)
   .padding(24)
-  panel.contentViewController = NSHostingController(rootView: root)
+  let hosting = NSHostingController(rootView: root)
+  panel.contentView = hosting.view
+  hosting.view.frame = panel.contentView!.bounds
+  hosting.view.autoresizingMask = [.width, .height]
   panel.center()
   NSApp.runModal(for: panel)
 }
@@ -573,14 +579,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         set: { self.showBalanceText = $0 }
       )
     )
+    .frame(width: 260, height: 500, alignment: .top)
+    .background(Color(nsColor: .windowBackgroundColor))
     let hosting = NSHostingController(rootView: panel)
-    // 禁用宿主自动尺寸报告，弹层尺寸完全由 contentSize 决定
+    // 显式固定尺寸：禁用自动尺寸报告，并把 preferredContentSize 与 contentSize 都设为同一值
     hosting.sizingOptions = []
+    let fixed = NSSize(width: 260, height: 500)
+    hosting.preferredContentSize = fixed
     p.contentViewController = hosting
-    // 用 SwiftUI 内容的实际期望高度决定弹层高度（260 宽，高度按内容自适应、限制在 560 以内）
-    let fitting = hosting.view.fittingSize
-    let height = min(max(fitting.height, 240), 560)
-    p.contentSize = NSSize(width: 260, height: height)
+    p.contentSize = fixed
     popover = p
   }
 
