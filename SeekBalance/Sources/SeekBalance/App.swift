@@ -91,6 +91,34 @@ func requestNotificationPermission() {
   UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
 }
 
+// MARK: - 液态玻璃面板（macOS 15+ 用 Liquid Glass，旧系统退回实心背景保证可读）
+
+struct GlassPanelModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(macOS 26.0, *) {
+      // macOS 26+：液态玻璃卡片 + 半透明底色（提升文字对比度，深浅色自适应）
+      content
+        .background(
+          RoundedRectangle(cornerRadius: 18)
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.35))
+        )
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
+    } else if #available(macOS 15.0, *) {
+      // macOS 15-25：毛玻璃材质
+      content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    } else {
+      // macOS 13/14：实心背景（旧版磨砂易读性差，优先可读）
+      content.background(Color(nsColor: .windowBackgroundColor))
+    }
+  }
+}
+
+extension View {
+  func glassPanel() -> some View {
+    modifier(GlassPanelModifier())
+  }
+}
+
 // MARK: - 更新状态
 
 enum UpdateStatus: Equatable {
@@ -595,7 +623,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       )
     )
     .frame(width: 260)
-    .background(Color(nsColor: .windowBackgroundColor))
     let hosting = NSHostingController(rootView: panel)
     // 禁用自动尺寸报告；弹层尺寸在每次打开时按内容重新测量（见 togglePopover）
     hosting.sizingOptions = []
@@ -618,6 +645,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
       // 让弹层获得键盘焦点（输入框/粘贴密钥可用）
       popover.contentViewController?.view.window?.makeKey()
+      // 弹层窗口透明：让液态玻璃透出桌面背景
+      if let win = popover.contentViewController?.view.window {
+        win.isOpaque = false
+        win.backgroundColor = .clear
+      }
     }
   }
 
@@ -828,10 +860,10 @@ struct BalancePanelView: View {
           .padding(.top, 1)
       }
     }
-    .padding(10)
+    .padding(12)
     .font(.system(size: 11))
-    // 实心背景 + 系统标签色：浅色=黑字/白底，深色=白字/黑底，永远可读
-    .background(Color(nsColor: .windowBackgroundColor))
+    // 液态玻璃（macOS 15+）＋系统标签色，深浅色自适应；旧系统退回实心背景
+    .glassPanel()
     .foregroundColor(Color(nsColor: .labelColor))
     // 点击面板空白处时取消数字框选中
     .onTapGesture { minutesFocused = false }
@@ -1013,10 +1045,10 @@ struct BalanceMenuView: View {
           .padding(.top, 2)
       }
     }
-    .padding(8)
+    .padding(10)
     .font(.system(size: 11))
-    // 实心背景：避免磨砂玻璃（vibrancy）导致文字难读
-    .background(Color(nsColor: .windowBackgroundColor))
+    // 液态玻璃（macOS 15+）＋系统标签色，深浅色自适应；旧系统退回实心背景
+    .glassPanel()
     // 系统标签色：浅色模式=黑、深色模式=白，自动适配
     .foregroundColor(Color(nsColor: .labelColor))
     // 点击面板空白处时取消数字框选中
