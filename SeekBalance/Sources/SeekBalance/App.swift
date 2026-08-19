@@ -96,11 +96,11 @@ func requestNotificationPermission() {
 struct GlassPanelModifier: ViewModifier {
   func body(content: Content) -> some View {
     if #available(macOS 26.0, *) {
-      // macOS 26+：液态玻璃卡片 + 半透明底色（提升文字对比度，深浅色自适应）
+      // macOS 26+：原生液态玻璃（.regular）；底色压到极淡，只保可读性、不泛白
       content
         .background(
           RoundedRectangle(cornerRadius: 18)
-            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.35))
+            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.06))
         )
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 18))
     } else if #available(macOS 15.0, *) {
