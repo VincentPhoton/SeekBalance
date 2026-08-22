@@ -73,7 +73,7 @@ Click "Check for Updates" in the panel or the right-click menu: it compares agai
 
 ## Installation
 
-1. Download the latest `SeekBalance-1.1.4-arm64.dmg` from [Releases](https://github.com/VincentPhoton/SeekBalance/releases/latest)
+1. Download the latest `SeekBalance-1.1.5-arm64.dmg` from [Releases](https://github.com/VincentPhoton/SeekBalance/releases/latest)
 2. Open the DMG and drag `SeekBalance.app` into "Applications"
 3. If macOS says "cannot verify the developer" on first launch: right-click → Open → Open again
 4. The DMG includes the "UninstallSeekBalance" one-click uninstaller
@@ -108,12 +108,13 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 |---|---|---|
 | Balance | `GET https://api.deepseek.com/user/balance` (Bearer auth) | **Whole account**, real-time & accurate |
 | Today's usage | Local `~/.dsh/sessions/*/*/session.jsonl.zstd` session logs | **This machine only** |
-| Cumulative usage | Local `~/.dsh/storages/session_projcache.json` | **This machine only** |
+| Cumulative usage | Same as today (scanning all session logs, de-duplicated) | **This machine only** |
 | Cost | Precise estimate per request by actual time, adapting to the latest peak/off-peak pricing | **This machine only, not an official bill** |
 
 - Your API key is **only** used to request DeepSeek's official endpoint (`api.deepseek.com`) and is never sent to any third party
 - This tool **does not upload any statistics**; all usage data comes from your local dsh files
 - DeepSeek does **not provide a public usage-query API** (tested `/user/usage` etc. all return 404), so usage stats can only be read from local records
+- Counting rules: **cross-session de-duplication + DeepSeek direct requests only**. dsh copies parent-session history into new session logs, so the same API request could be recorded up to 9 times; requests are now de-duplicated by a "timestamp + tokens" signature. Calls routed through third parties such as OpenRouter don't charge the DeepSeek balance and are excluded as well
 
 ## Uninstall
 
@@ -124,7 +125,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## Build
 
 - Build: `swift build -c release`
-- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.4-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
+- Create DMG: `hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.5-arm64.dmg"` (put the `.app`, an Applications shortcut, the uninstaller, and install notes into `dmg-build/`)
 
 ## License
 

@@ -752,8 +752,9 @@ struct BalancePanelView: View {
       row("累计输出", fmtTokens(model.totals.output))
       row("累计花费", fmtYuan(model.cumCost), bold: true)
 
-      // 备注：今日/累计用量都只算本机（DeepSeek 无公开用量接口，全账户用量查不到）
-      Text("注：今日/累计用量均仅统计这台电脑（余额为全账户）")
+      // 备注：口径说明——只算本机日志里 DeepSeek 直连的请求（已跨会话去重）；
+      // 走 OpenRouter 等第三方的调用不扣 DeepSeek 余额；余额本身是全账户的
+      Text("注：今日/累计仅统计本机 DeepSeek 直连请求（已去重）；余额为全账户")
         .font(.system(size: 9))
         .foregroundColor(Color(nsColor: .secondaryLabelColor))
         .padding(.top, 2)
@@ -944,7 +945,7 @@ struct BalanceMenuView: View {
       row("累计输出", fmtTokens(model.totals.output))
       row("累计花费", fmtYuan(model.cumCost), bold: true)
 
-      Text("注：今日/累计用量均仅统计这台电脑（余额为全账户）")
+      Text("注：今日/累计仅统计本机 DeepSeek 直连请求（已去重）；余额为全账户")
         .font(.system(size: 9))
         .foregroundColor(Color(nsColor: .secondaryLabelColor))
         .padding(.top, 2)

@@ -143,7 +143,6 @@ func nextPeakStart(after date: Date = Date()) -> Date? {
 enum DS {
   static let home = FileManager.default.homeDirectoryForCurrentUser
   static var credentialsPath: URL { home.appendingPathComponent(".dsh/.credentials.yaml") }
-  static var projCachePath: URL { home.appendingPathComponent(".dsh/storages/session_projcache.json") }
   static var sessionsRoot: URL { home.appendingPathComponent(".dsh/sessions") }
 
   /// 读取 DEEPSEEK_API_KEY：优先 dsh 配置文件（老用户），其次本机钥匙串（普通用户粘贴）
@@ -195,37 +194,26 @@ enum DS {
     )
   }
 
-  /// 累计用量：~/.dsh/storages/session_projcache.json -> tokenUsage.totals
-  static func readTotals() -> Totals {
-    guard let data = try? Data(contentsOf: projCachePath),
-      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else { return Totals() }
-    var out = Totals()
-    guard let tables = obj["tables"] as? [String: Any],
-      let sessions = tables["sessions"] as? [String: Any]
-    else { return out }
-    for (_, s) in sessions {
-      guard let s = s as? [String: Any],
-        let rows = s["rows"] as? [String: Any],
-        let tu = rows["tokenUsage"] as? [String: Any],
-        let val = tu["val"] as? [String: Any],
-        let totals = val["totals"] as? [String: Any]
-      else { continue }
-      out.uncachedInput += (totals["uncachedInputTokens"] as? NSNumber)?.int64Value ?? 0
-      out.cacheRead += (totals["cacheReadTokens"] as? NSNumber)?.int64Value ?? 0
-      out.output += (totals["outputTokens"] as? NSNumber)?.int64Value ?? 0
-    }
-    return out
-  }
+  /// 累计用量不再单独读取：与今日同一来源（readTodayAndCumulativeCost 扫描全部日志，
+  /// 去重并过滤渠道后统计）。旧的 session_projcache.json 缓存含跨会话重复记录，
+  /// 且不区分 DeepSeek 直连/第三方渠道，数字虚高近 4 倍，已弃用。
 
-  /// 一次扫描全部会话日志：今日精确用量（含按请求时间精确计价的花费）+ 累计精确花费
+  /// 一次扫描全部会话日志：今日精确用量（含按请求时间精确计价的花费）+ 累计精确用量与花费
   /// （8/17 0 点前的请求按老价，之后按请求时刻的高峰/空闲价）
-  static func readTodayAndCumulativeCost() -> (today: TodayUsage, cumCost: Double) {
+  ///
+  /// 统计口径（2026-08-22 与 DeepSeek 后台核对后修正）：
+  /// 1. **跨文件去重**：dsh 开新会话时会把父会话历史整段复制进新日志，
+  ///    同一笔请求最多被重复记录 9 次。按「时间戳+未命中+缓存读+输出」签名去重，每笔只算一次。
+  /// 2. **只统计 DeepSeek 直连**：`data.message.source.provider` 以 deepseek 开头的才计入；
+  ///    走 OpenRouter 等第三方渠道的请求不扣 DeepSeek 余额，不算进来。
+  static func readTodayAndCumulativeCost() -> (today: TodayUsage, cum: Totals, cumCost: Double) {
     var today = TodayUsage()
+    var cum = Totals()
     var cumCost = 0.0
+    var seen = Set<String>() // 去重签名："时间戳|未命中|缓存读|输出"
     let midnight = Calendar.current.startOfDay(for: Date()).timeIntervalSince1970 * 1000
     let fm = FileManager.default
-    guard let wsDirs = try? fm.contentsOfDirectory(at: sessionsRoot, includingPropertiesForKeys: nil) else { return (today, cumCost) }
+    guard let wsDirs = try? fm.contentsOfDirectory(at: sessionsRoot, includingPropertiesForKeys: nil) else { return (today, cum, cumCost) }
     for ws in wsDirs {
       guard let sessionDirs = try? fm.contentsOfDirectory(at: ws, includingPropertiesForKeys: nil) else { continue }
       for sdir in sessionDirs {
@@ -239,23 +227,35 @@ enum DS {
             let data = obj["data"] as? [String: Any],
             let usage = data["usage"] as? [String: Any]
           else { continue }
+          // 第三方渠道（如 openrouter）的调用不扣 DeepSeek 余额，跳过；
+          // 没有 source 字段的旧日志无法判断，按 DeepSeek 计入
+          if let msg = data["message"] as? [String: Any],
+            let src = msg["source"] as? [String: Any],
+            let provider = src["provider"] as? String,
+            !provider.hasPrefix("deepseek") { continue }
           let timeMs = time.doubleValue
           let uncached = (usage["inputTokens"] as? NSNumber)?.int64Value ?? 0
           let cacheRead = (usage["cacheReadTokens"] as? NSNumber)?.int64Value ?? 0
           let output = (usage["outputTokens"] as? NSNumber)?.int64Value ?? 0
+          // 同一笔请求被复制进多个日志文件：签名相同只计第一次
+          let sig = "\(timeMs)|\(uncached)|\(cacheRead)|\(output)"
+          guard !seen.contains(sig) else { continue }
+          seen.insert(sig)
           let p = Prices.price(for: timeMs)
-          cumCost += Double(uncached) / 1e6 * p.cacheMiss
+          let reqCost = Double(uncached) / 1e6 * p.cacheMiss
             + Double(cacheRead) / 1e6 * p.cacheHit
             + Double(output) / 1e6 * p.output
+          cumCost += reqCost
+          cum.uncachedInput += uncached
+          cum.cacheRead += cacheRead
+          cum.output += output
           guard timeMs >= midnight else { continue }
           today.calls += 1
           today.uncachedInput += uncached
           today.output += output
           today.cacheRead += cacheRead
           today.reasoning += (usage["reasoningTokens"] as? NSNumber)?.int64Value ?? 0
-          today.cost += Double(uncached) / 1e6 * p.cacheMiss
-            + Double(cacheRead) / 1e6 * p.cacheHit
-            + Double(output) / 1e6 * p.output
+          today.cost += reqCost
           if Prices.isPeak(Prices.beijingMinutes(for: timeMs)) {
             today.peakTokens += uncached + cacheRead + output
           } else {
@@ -264,7 +264,7 @@ enum DS {
         }
       }
     }
-    return (today, cumCost)
+    return (today, cum, cumCost)
   }
 
   /// 定位 zstd 可执行文件（不同机器安装位置不同，兼容常见路径）
@@ -308,7 +308,7 @@ func buildReport() async -> Report {
   var rep = Report(
     balance: nil,
     balanceError: nil,
-    totals: DS.readTotals(),
+    totals: scan.cum,
     today: scan.today,
     costCurrent: 0,
     todayCost: scan.today.cost,

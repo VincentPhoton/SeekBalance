@@ -73,7 +73,7 @@
 
 ## 安装
 
-1. 从 [Releases](https://github.com/VincentPhoton/SeekBalance/releases/latest) 下载最新版 `SeekBalance-1.1.4-arm64.dmg`
+1. 从 [Releases](https://github.com/VincentPhoton/SeekBalance/releases/latest) 下载最新版 `SeekBalance-1.1.5-arm64.dmg`
 2. 打开 DMG，把 `SeekBalance.app` 拖入"应用程序"
 3. 首次打开若提示"无法验证开发者"：右键 → 打开 → 再点"打开"
 4. DMG 内附带"卸载SeekBalance"一键卸载程序
@@ -108,12 +108,13 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 |---|---|---|
 | 余额 | `GET https://api.deepseek.com/user/balance`（Bearer 认证） | **全账户**，实时准确 |
 | 今日用量 | 本机 `~/.dsh/sessions/*/*/session.jsonl.zstd` 会话日志 | **仅本机** |
-| 累计用量 | 本机 `~/.dsh/storages/session_projcache.json` | **仅本机** |
+| 累计用量 | 同今日（扫描全部会话日志，去重后统计） | **仅本机** |
 | 花费 | 按**每次请求的实际时间**精确计价，适配最新峰谷价格 | **仅本机，非官方账单** |
 
 - 你的 API 密钥**只用于**请求 DeepSeek 官方接口（`api.deepseek.com`），不会发送到任何第三方
 - 本工具**不联网上传任何统计数据**，所有用量数据都来自你本地的 dsh 文件
 - DeepSeek **未提供公开的用量查询接口**（实测 `/user/usage` 等均返回 404），因此用量统计只能读取本机记录
+- 用量统计口径：**跨会话去重 + 只统计 DeepSeek 直连请求**。dsh 开新会话会复制父会话历史导致同一请求被重复记录（实测最多 9 次），已按「时间戳 + tokens」签名去重；走 OpenRouter 等第三方渠道的调用不扣 DeepSeek 余额，同样不计入
 
 ## 卸载
 
@@ -124,7 +125,7 @@ SWIFTPM_CACHE_DIR=/tmp/swiftpm-cache swift build -c release
 ## 构建
 
 - 编译：`swift build -c release`
-- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.4-arm64.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
+- 打 DMG：`hdiutil create -volname "SeekBalance" -srcfolder dmg-build -ov -format UDZO -fs HFS+ "SeekBalance-1.1.5-arm64.dmg"`（`dmg-build/` 内放入 `.app`、Applications 快捷方式、卸载程序与安装说明）
 
 ## License
 
